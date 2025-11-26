@@ -98,7 +98,7 @@ const Index = () => {
 
         if (error) throw error;
 
-        const assistantMessage = `I've generated a smart contract for you:\n\n**${data.contract_name}**\n\n${data.deployment_notes || ""}`;
+        const assistantMessage = `Generated smart contract: **${data.contract_name}**`;
         setMessages(prev => [...prev, { role: "assistant", content: assistantMessage }]);
         setGeneratedContent({ type: "contract", code: data.solidity_code, metadata: data });
         
@@ -148,9 +148,6 @@ const Index = () => {
         let streamDone = false;
         let assistantSoFar = "";
 
-        // Add empty assistant message
-        setMessages(prev => [...prev, { role: "assistant", content: "" }]);
-
         while (!streamDone) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -176,16 +173,7 @@ const Index = () => {
               const content = parsed.choices?.[0]?.delta?.content as string | undefined;
               if (content) {
                 assistantSoFar += content;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  newMessages[newMessages.length - 1] = {
-                    role: "assistant",
-                    content: assistantSoFar
-                  };
-                  return newMessages;
-                });
-                
-                // Update preview in real-time
+                // Update preview in real-time (but not chat)
                 setGeneratedContent({ type: "web", code: assistantSoFar });
               }
             } catch {
@@ -194,6 +182,9 @@ const Index = () => {
             }
           }
         }
+        
+        // Add completion message to chat (without code)
+        setMessages(prev => [...prev, { role: "assistant", content: "Generated web page successfully" }]);
 
         setGenerationStatus("Generation complete!");
         
