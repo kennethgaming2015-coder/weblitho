@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download } from "lucide-react";
+import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { ContractInteraction } from "@/components/web3/ContractInteraction";
 
 interface PreviewPanelProps {
   code: string;
@@ -144,34 +145,56 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
           </TabsContent>
         </Tabs>
       ) : (
-        <div className="p-6">
-          {metadata?.deployment_notes && (
-            <div className="mb-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
-              <h4 className="text-sm font-semibold text-white mb-2">Deployment Notes</h4>
-              <p className="text-sm text-white/70">{metadata.deployment_notes}</p>
-            </div>
-          )}
-          
-          {metadata?.security_notes && (
-            <div className="mb-4 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
-              <h4 className="text-sm font-semibold text-white mb-2">Security Notes</h4>
-              <p className="text-sm text-white/70">{metadata.security_notes}</p>
-            </div>
-          )}
+        <Tabs defaultValue="code" className="w-full">
+          <div className="flex items-center px-4 py-2 border-b border-white/10 bg-[#0d0d0d]">
+            <TabsList className="bg-white/5">
+              <TabsTrigger value="code" className="data-[state=active]:bg-white/10">
+                <Code2 className="h-4 w-4 mr-2" />
+                Code
+              </TabsTrigger>
+              <TabsTrigger value="interact" className="data-[state=active]:bg-white/10">
+                <Layers className="h-4 w-4 mr-2" />
+                Interact
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-          <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[600px] overflow-y-auto scrollbar-thin">
-            <code>{code}</code>
-          </pre>
+          <TabsContent value="code" className="p-6 m-0">
+            {metadata?.deployment_notes && (
+              <div className="mb-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
+                <h4 className="text-sm font-semibold text-white mb-2">Deployment Notes</h4>
+                <p className="text-sm text-white/70">{metadata.deployment_notes}</p>
+              </div>
+            )}
+            
+            {metadata?.security_notes && (
+              <div className="mb-4 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <h4 className="text-sm font-semibold text-white mb-2">Security Notes</h4>
+                <p className="text-sm text-white/70">{metadata.security_notes}</p>
+              </div>
+            )}
 
-          {metadata?.abi && (
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-white mb-2">ABI</h4>
-              <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[300px] overflow-y-auto scrollbar-thin">
-                <code>{JSON.stringify(metadata.abi, null, 2)}</code>
-              </pre>
-            </div>
-          )}
-        </div>
+            <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[600px] overflow-y-auto scrollbar-thin">
+              <code>{code}</code>
+            </pre>
+
+            {metadata?.abi && (
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold text-white mb-2">ABI</h4>
+                <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[300px] overflow-y-auto scrollbar-thin">
+                  <code>{JSON.stringify(metadata.abi, null, 2)}</code>
+                </pre>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="interact" className="p-6 m-0">
+            <ContractInteraction 
+              initialAbi={metadata?.abi || ''} 
+              initialAddress=""
+            />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );
