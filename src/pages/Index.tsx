@@ -3,7 +3,7 @@ import { ChatHero } from "@/components/chat/ChatHero";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { PreviewPanel } from "@/components/preview/PreviewPanel";
 import { ModelType } from "@/components/builder/SettingsDialog";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -312,8 +312,13 @@ const Index = () => {
                 />
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-white/40">
-                <p>Waiting for generation...</p>
+              <div className="h-full flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/5">
+                    <Sparkles className="h-6 w-6 text-white/40" />
+                  </div>
+                  <p className="text-sm text-white/40">Preview will appear here</p>
+                </div>
               </div>
             )}
           </div>
