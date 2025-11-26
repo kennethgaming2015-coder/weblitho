@@ -1,18 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatPanelProps {
   prompts: Array<{ role: "user" | "assistant"; content: string }>;
   onSubmit: (prompt: string) => void;
+  isGenerating?: boolean;
 }
 
-export const ChatPanel = ({ prompts, onSubmit }: ChatPanelProps) => {
+export const ChatPanel = ({ prompts, onSubmit, isGenerating = false }: ChatPanelProps) => {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -21,7 +24,7 @@ export const ChatPanel = ({ prompts, onSubmit }: ChatPanelProps) => {
   }, [prompts]);
 
   const handleSubmit = () => {
-    if (input.trim()) {
+    if (input.trim() && !isGenerating) {
       onSubmit(input);
       setInput("");
     }
@@ -114,9 +117,19 @@ export const ChatPanel = ({ prompts, onSubmit }: ChatPanelProps) => {
             onKeyDown={handleKeyDown}
             placeholder="Describe what you want to build..."
             className="min-h-[60px] resize-none"
+            disabled={isGenerating}
           />
-          <Button onClick={handleSubmit} size="icon" className="shrink-0">
-            <Send className="h-4 w-4" />
+          <Button 
+            onClick={handleSubmit} 
+            size="icon" 
+            className="shrink-0"
+            disabled={isGenerating || !input.trim()}
+          >
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
