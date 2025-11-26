@@ -21,12 +21,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 export type ModelType = 
-  | "google/gemini-2.5-flash" 
-  | "google/gemini-2.5-pro" 
-  | "google/gemini-2.5-flash-lite"
   | "gemini-2.0-flash-exp"
   | "gemini-1.5-pro"
-  | "gemini-1.5-flash";
+  | "gemini-1.5-flash"
+  | "google/gemini-2.5-flash" 
+  | "google/gemini-2.5-pro" 
+  | "google/gemini-2.5-flash-lite";
 
 interface SettingsDialogProps {
   onSettingsChange: (model: ModelType) => void;
@@ -34,7 +34,7 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<ModelType>("google/gemini-2.5-flash");
+  const [model, setModel] = useState<ModelType>("gemini-2.0-flash-exp");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,24 +47,25 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
     onSettingsChange(model);
 
     const isLovable = model.startsWith("google/");
+    const modelName = model.replace("google/", "");
     toast({
       title: "Settings Saved",
-      description: `Now using ${isLovable ? "Lovable AI" : "Google Gemini Direct"} with ${model}`,
+      description: `Now using ${modelName}`,
     });
 
     setOpen(false);
   };
 
-  const lovableModels: ModelType[] = [
-    "google/gemini-2.5-flash",
-    "google/gemini-2.5-pro",
-    "google/gemini-2.5-flash-lite",
-  ];
-
-  const geminiModels: ModelType[] = [
+  const baseModels: ModelType[] = [
     "gemini-2.0-flash-exp",
     "gemini-1.5-pro",
     "gemini-1.5-flash",
+  ];
+
+  const advancedModels: ModelType[] = [
+    "google/gemini-2.5-flash",
+    "google/gemini-2.5-pro",
+    "google/gemini-2.5-flash-lite",
   ];
 
   return (
@@ -86,40 +87,40 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
           <div className="space-y-4">
             <div>
               <Label className="text-base font-semibold mb-3 block">
-                Lovable AI Models
+                Base Models (Recommended)
               </Label>
               <p className="text-xs text-muted-foreground mb-2">
-                No setup required, usage-based pricing through Lovable
+                Gemini 1.5 & 2.0 - Best for everyday page generation
               </p>
               <Select 
-                value={lovableModels.includes(model) ? model : undefined} 
+                value={baseModels.includes(model) ? model : undefined}
                 onValueChange={(value) => setModel(value as ModelType)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Lovable AI model" />
+                  <SelectValue placeholder="Select base model" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="google/gemini-2.5-flash">
+                  <SelectItem value="gemini-2.0-flash-exp">
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">Gemini 2.5 Flash</span>
+                      <span className="font-medium">Gemini 2.0 Flash (Experimental)</span>
                       <span className="text-xs text-muted-foreground">
-                        Fast & efficient, best for most tasks
+                        ⭐ Latest & fastest - Recommended default
                       </span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="google/gemini-2.5-pro">
+                  <SelectItem value="gemini-1.5-flash">
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">Gemini 2.5 Pro</span>
+                      <span className="font-medium">Gemini 1.5 Flash</span>
                       <span className="text-xs text-muted-foreground">
-                        Most capable, complex reasoning
+                        Fast and reliable for standard pages
                       </span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="google/gemini-2.5-flash-lite">
+                  <SelectItem value="gemini-1.5-pro">
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">Gemini 2.5 Flash Lite</span>
+                      <span className="font-medium">Gemini 1.5 Pro</span>
                       <span className="text-xs text-muted-foreground">
-                        Fastest & cheapest
+                        Most capable for complex layouts
                       </span>
                     </div>
                   </SelectItem>
@@ -129,40 +130,40 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
 
             <div className="pt-4 border-t">
               <Label className="text-base font-semibold mb-3 block">
-                Google Gemini Direct
+                Advanced Models (Via Lovable AI)
               </Label>
               <p className="text-xs text-muted-foreground mb-2">
-                Uses your configured Gemini API key
+                Gemini 2.5 - For complex queries & advanced reasoning
               </p>
               <Select 
-                value={geminiModels.includes(model) ? model : undefined}
+                value={advancedModels.includes(model) ? model : undefined} 
                 onValueChange={(value) => setModel(value as ModelType)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Gemini model" />
+                  <SelectValue placeholder="Select advanced model" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gemini-2.0-flash-exp">
+                  <SelectItem value="google/gemini-2.5-flash">
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">Gemini 2.0 Flash (Exp)</span>
+                      <span className="font-medium">Gemini 2.5 Flash</span>
                       <span className="text-xs text-muted-foreground">
-                        Latest experimental model
+                        Advanced reasoning, multimodal
                       </span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="gemini-1.5-pro">
+                  <SelectItem value="google/gemini-2.5-pro">
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">Gemini 1.5 Pro</span>
+                      <span className="font-medium">Gemini 2.5 Pro</span>
                       <span className="text-xs text-muted-foreground">
-                        Most capable stable model
+                        Most advanced, complex queries
                       </span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="gemini-1.5-flash">
+                  <SelectItem value="google/gemini-2.5-flash-lite">
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">Gemini 1.5 Flash</span>
+                      <span className="font-medium">Gemini 2.5 Flash Lite</span>
                       <span className="text-xs text-muted-foreground">
-                        Fast and efficient
+                        Lightweight advanced model
                       </span>
                     </div>
                   </SelectItem>

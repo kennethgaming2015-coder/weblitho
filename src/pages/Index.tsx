@@ -30,7 +30,7 @@ const Index = () => {
   const [prompts, setPrompts] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelType>(
-    (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.5-flash"
+    (localStorage.getItem("ai_model") as ModelType) || "gemini-2.0-flash-exp"
   );
 
   const currentPage = pages.find(p => p.id === currentPageId);
