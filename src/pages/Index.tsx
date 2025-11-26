@@ -4,7 +4,7 @@ import { ProjectSidebar } from "@/components/builder/ProjectSidebar";
 import { CanvasPreview } from "@/components/builder/CanvasPreview";
 import { ChatPanel } from "@/components/builder/ChatPanel";
 import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
-import { AIProvider, ModelType } from "@/components/builder/SettingsDialog";
+import { ModelType } from "@/components/builder/SettingsDialog";
 
 export interface Page {
   id: string;
@@ -29,15 +29,9 @@ const Index = () => {
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [prompts, setPrompts] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [aiSettings, setAISettings] = useState<{
-    provider: AIProvider;
-    model: ModelType;
-    apiKey?: string;
-  }>({
-    provider: (localStorage.getItem("ai_provider") as AIProvider) || "lovable",
-    model: (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.5-flash",
-    apiKey: localStorage.getItem("gemini_api_key") || undefined,
-  });
+  const [selectedModel, setSelectedModel] = useState<ModelType>(
+    (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.5-flash"
+  );
 
   const currentPage = pages.find(p => p.id === currentPageId);
 
@@ -51,39 +45,19 @@ const Index = () => {
         content: p.content
       }));
 
-      let response: Response;
-
-      if (aiSettings.provider === "lovable") {
-        const GENERATE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
-        response = await fetch(GENERATE_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
-            prompt, 
-            conversationHistory,
-            model: aiSettings.model 
-          }),
-        });
-      } else {
-        // Use Gemini direct
-        const GEMINI_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page-gemini`;
-        response = await fetch(GEMINI_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
-            prompt, 
-            conversationHistory,
-            model: aiSettings.model,
-            apiKey: aiSettings.apiKey 
-          }),
-        });
-      }
+      const GENERATE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
+      const response = await fetch(GENERATE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ 
+          prompt, 
+          conversationHistory,
+          model: selectedModel
+        }),
+      });
 
       if (!response.ok || !response.body) {
         const errorData = await response.json().catch(() => ({ error: "Failed to generate page" }));
@@ -185,7 +159,7 @@ const Index = () => {
   };
 
   return (
-    <BuilderLayout onSettingsChange={setAISettings}>
+    <BuilderLayout onSettingsChange={setSelectedModel}>
       <ProjectSidebar
         pages={pages}
         currentPageId={currentPageId}

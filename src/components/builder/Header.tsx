@@ -1,14 +1,10 @@
 import { Moon, Sun, Code2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { SettingsDialog, AIProvider, ModelType } from "./SettingsDialog";
+import { SettingsDialog, ModelType } from "./SettingsDialog";
 
 interface HeaderProps {
-  onSettingsChange: (settings: {
-    provider: AIProvider;
-    model: ModelType;
-    apiKey?: string;
-  }) => void;
+  onSettingsChange: (model: ModelType) => void;
 }
 
 export const Header = ({ onSettingsChange }: HeaderProps) => {

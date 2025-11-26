@@ -1,14 +1,10 @@
 import { ReactNode } from "react";
 import { Header } from "./Header";
-import { AIProvider, ModelType } from "./SettingsDialog";
+import { ModelType } from "./SettingsDialog";
 
 interface BuilderLayoutProps {
   children: ReactNode;
-  onSettingsChange: (settings: {
-    provider: AIProvider;
-    model: ModelType;
-    apiKey?: string;
-  }) => void;
+  onSettingsChange: (model: ModelType) => void;
 }
 
 export const BuilderLayout = ({ children, onSettingsChange }: BuilderLayoutProps) => {

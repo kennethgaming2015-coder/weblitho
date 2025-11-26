@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { Settings, Key } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -21,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-export type AIProvider = "lovable" | "gemini";
 export type ModelType = 
   | "google/gemini-2.5-flash" 
   | "google/gemini-2.5-pro" 
@@ -31,55 +29,27 @@ export type ModelType =
   | "gemini-1.5-flash";
 
 interface SettingsDialogProps {
-  onSettingsChange: (settings: {
-    provider: AIProvider;
-    model: ModelType;
-    apiKey?: string;
-  }) => void;
+  onSettingsChange: (model: ModelType) => void;
 }
 
 export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [provider, setProvider] = useState<AIProvider>("lovable");
   const [model, setModel] = useState<ModelType>("google/gemini-2.5-flash");
-  const [geminiApiKey, setGeminiApiKey] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
-    const savedProvider = localStorage.getItem("ai_provider") as AIProvider;
     const savedModel = localStorage.getItem("ai_model") as ModelType;
-    const savedApiKey = localStorage.getItem("gemini_api_key");
-
-    if (savedProvider) setProvider(savedProvider);
     if (savedModel) setModel(savedModel);
-    if (savedApiKey) setGeminiApiKey(savedApiKey);
   }, []);
 
   const handleSave = () => {
-    if (provider === "gemini" && !geminiApiKey.trim()) {
-      toast({
-        title: "API Key Required",
-        description: "Please enter your Gemini API key",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    localStorage.setItem("ai_provider", provider);
     localStorage.setItem("ai_model", model);
-    if (provider === "gemini") {
-      localStorage.setItem("gemini_api_key", geminiApiKey);
-    }
+    onSettingsChange(model);
 
-    onSettingsChange({
-      provider,
-      model,
-      apiKey: provider === "gemini" ? geminiApiKey : undefined,
-    });
-
+    const isLovable = model.startsWith("google/");
     toast({
       title: "Settings Saved",
-      description: `Now using ${provider === "lovable" ? "Lovable AI" : "Google Gemini"} with ${model}`,
+      description: `Now using ${isLovable ? "Lovable AI" : "Google Gemini Direct"} with ${model}`,
     });
 
     setOpen(false);
@@ -97,8 +67,6 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
     "gemini-1.5-flash",
   ];
 
-  const availableModels = provider === "lovable" ? lovableModels : geminiModels;
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -108,94 +76,100 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>AI Settings</DialogTitle>
+          <DialogTitle>AI Model Settings</DialogTitle>
           <DialogDescription>
-            Configure your AI provider and model preferences
+            Choose which AI model to use for page generation
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label>AI Provider</Label>
-            <Select
-              value={provider}
-              onValueChange={(value) => {
-                setProvider(value as AIProvider);
-                // Reset model when switching providers
-                setModel(value === "lovable" ? "google/gemini-2.5-flash" : "gemini-2.0-flash-exp");
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lovable">
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">Lovable AI</span>
-                    <span className="text-xs text-muted-foreground">
-                      No API key needed, usage-based pricing
-                    </span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="gemini">
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">Google Gemini Direct</span>
-                    <span className="text-xs text-muted-foreground">
-                      Requires your own API key
-                    </span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Model</Label>
-            <Select value={model} onValueChange={(value) => setModel(value as ModelType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableModels.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {m}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {provider === "lovable" 
-                ? "Flash: Fast & efficient, Pro: Most capable, Lite: Fastest & cheapest"
-                : "2.0 Flash: Latest experimental, 1.5 Pro: Most capable, 1.5 Flash: Fast"}
-            </p>
-          </div>
-
-          {provider === "gemini" && (
-            <div className="space-y-2">
-              <Label htmlFor="api-key">
-                <Key className="h-3 w-3 inline mr-1" />
-                Gemini API Key
+          <div className="space-y-4">
+            <div>
+              <Label className="text-base font-semibold mb-3 block">
+                Lovable AI Models
               </Label>
-              <Input
-                id="api-key"
-                type="password"
-                value={geminiApiKey}
-                onChange={(e) => setGeminiApiKey(e.target.value)}
-                placeholder="Enter your Google Gemini API key"
-              />
-              <p className="text-xs text-muted-foreground">
-                Get your API key from{" "}
-                <a
-                  href="https://makersuite.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Google AI Studio
-                </a>
+              <p className="text-xs text-muted-foreground mb-2">
+                No setup required, usage-based pricing through Lovable
               </p>
+              <Select 
+                value={lovableModels.includes(model) ? model : undefined} 
+                onValueChange={(value) => setModel(value as ModelType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Lovable AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="google/gemini-2.5-flash">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Gemini 2.5 Flash</span>
+                      <span className="text-xs text-muted-foreground">
+                        Fast & efficient, best for most tasks
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="google/gemini-2.5-pro">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Gemini 2.5 Pro</span>
+                      <span className="text-xs text-muted-foreground">
+                        Most capable, complex reasoning
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="google/gemini-2.5-flash-lite">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Gemini 2.5 Flash Lite</span>
+                      <span className="text-xs text-muted-foreground">
+                        Fastest & cheapest
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          )}
+
+            <div className="pt-4 border-t">
+              <Label className="text-base font-semibold mb-3 block">
+                Google Gemini Direct
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Uses your configured Gemini API key
+              </p>
+              <Select 
+                value={geminiModels.includes(model) ? model : undefined}
+                onValueChange={(value) => setModel(value as ModelType)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Gemini model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gemini-2.0-flash-exp">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Gemini 2.0 Flash (Exp)</span>
+                      <span className="text-xs text-muted-foreground">
+                        Latest experimental model
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="gemini-1.5-pro">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Gemini 1.5 Pro</span>
+                      <span className="text-xs text-muted-foreground">
+                        Most capable stable model
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="gemini-1.5-flash">
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">Gemini 1.5 Flash</span>
+                      <span className="text-xs text-muted-foreground">
+                        Fast and efficient
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
