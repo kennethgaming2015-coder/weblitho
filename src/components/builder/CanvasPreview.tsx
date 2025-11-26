@@ -43,9 +43,26 @@ export const CanvasPreview = ({ content }: CanvasPreviewProps) => {
             minHeight: "600px",
           }}
         >
-          <div
-            dangerouslySetInnerHTML={{ __html: content }}
-            className="w-full h-full"
+          <iframe
+            srcDoc={`
+              <!DOCTYPE html>
+              <html>
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <script src="https://cdn.tailwindcss.com"></script>
+                  <style>
+                    body { margin: 0; padding: 0; }
+                  </style>
+                </head>
+                <body>
+                  ${content}
+                </body>
+              </html>
+            `}
+            className="w-full h-full border-0"
+            style={{ minHeight: "600px" }}
+            title="Preview"
           />
         </div>
       </div>
