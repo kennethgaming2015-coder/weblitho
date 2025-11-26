@@ -21,9 +21,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 export type ModelType = 
-  | "gemini-2.0-flash-exp"
-  | "gemini-1.5-pro"
-  | "gemini-1.5-flash"
   | "google/gemini-2.5-flash" 
   | "google/gemini-2.5-pro" 
   | "google/gemini-2.5-flash-lite";
@@ -34,7 +31,7 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<ModelType>("gemini-2.0-flash-exp");
+  const [model, setModel] = useState<ModelType>("google/gemini-2.5-flash");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,11 +43,11 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
     localStorage.setItem("ai_model", model);
     onSettingsChange(model);
 
-    const modelDisplayName = model.includes("2.0") 
-      ? "QubeAI 2.0" 
-      : model.includes("1.5")
-      ? "QubeAI 1.5"
-      : "QubeAI Advanced";
+    const modelDisplayName = model.includes("2.5-pro") 
+      ? "QubeAI 2.5 Pro" 
+      : model.includes("2.5-flash-lite")
+      ? "QubeAI 2.5 Flash Lite"
+      : "QubeAI 2.5 Flash";
     
     toast({
       title: "Model Updated",
@@ -59,18 +56,6 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
 
     setOpen(false);
   };
-
-  const baseModels: ModelType[] = [
-    "gemini-2.0-flash-exp",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash",
-  ];
-
-  const advancedModels: ModelType[] = [
-    "google/gemini-2.5-flash",
-    "google/gemini-2.5-pro",
-    "google/gemini-2.5-flash-lite",
-  ];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -96,93 +81,46 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
             <div className="rounded-lg border border-primary/20 bg-gradient-accent p-4">
               <Label className="text-base font-semibold mb-3 flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                QubeAI 2.0 (Recommended)
+                QubeAI Models
               </Label>
               <p className="text-xs text-muted-foreground mb-3">
-                Latest generation models optimized for speed and quality
+                Choose the AI model that powers your generation
               </p>
               <Select 
-                value={baseModels.includes(model) ? model : undefined}
+                value={model}
                 onValueChange={(value) => setModel(value as ModelType)}
               >
                 <SelectTrigger className="bg-background/50 backdrop-blur">
-                  <SelectValue placeholder="Select QubeAI 2.0 model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gemini-2.0-flash-exp">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">2.0 Flash</span>
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">FASTEST</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        ⚡ Lightning-fast generation, ideal for rapid prototyping
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="gemini-1.5-flash">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <span className="font-semibold">1.5 Flash</span>
-                      <span className="text-xs text-muted-foreground">
-                        🎯 Balanced speed and quality for standard pages
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="gemini-1.5-pro">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <span className="font-semibold">1.5 Pro</span>
-                      <span className="text-xs text-muted-foreground">
-                        🎨 Superior quality for complex, detailed layouts
-                      </span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="rounded-lg border border-border bg-card p-4">
-              <Label className="text-base font-semibold mb-3 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-primary" />
-                Advanced Models
-              </Label>
-              <p className="text-xs text-muted-foreground mb-3">
-                Next-gen models with advanced reasoning for complex queries
-              </p>
-              <Select 
-                value={advancedModels.includes(model) ? model : undefined} 
-                onValueChange={(value) => setModel(value as ModelType)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select advanced model" />
+                  <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="google/gemini-2.5-flash">
                     <div className="flex flex-col items-start gap-1 py-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">2.5 Flash</span>
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">NEW</span>
+                        <span className="font-semibold">QubeAI 2.5 Flash</span>
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">RECOMMENDED</span>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        🧠 Advanced reasoning with multimodal capabilities
+                        ⚡ Balanced speed and quality for most projects
                       </span>
                     </div>
                   </SelectItem>
                   <SelectItem value="google/gemini-2.5-pro">
                     <div className="flex flex-col items-start gap-1 py-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">2.5 Pro</span>
+                        <span className="font-semibold">QubeAI 2.5 Pro</span>
                         <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full font-medium">PREMIUM</span>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        🚀 Most capable model for highly complex projects
+                        🚀 Most capable for complex reasoning and projects
                       </span>
                     </div>
                   </SelectItem>
                   <SelectItem value="google/gemini-2.5-flash-lite">
                     <div className="flex flex-col items-start gap-1 py-1">
-                      <span className="font-semibold">2.5 Flash Lite</span>
+                      <span className="font-semibold">QubeAI 2.5 Flash Lite</span>
                       <span className="text-xs text-muted-foreground">
-                        ⚡ Lightweight with advanced features
+                        💨 Fastest generation for simple projects
                       </span>
                     </div>
                   </SelectItem>
