@@ -2,6 +2,3 @@ project_id = "tgpftguaytmyfcvoqdpy"
 
 [functions.generate-page]
 verify_jwt = false
-
-[functions.generate-page-gemini]
-verify_jwt = false
