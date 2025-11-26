@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { ChatHero } from "@/components/chat/ChatHero";
 import { ChatInterface } from "@/components/chat/ChatInterface";
+import { PreviewPanel } from "@/components/preview/PreviewPanel";
 import { ModelType } from "@/components/builder/SettingsDialog";
-import { Moon, Sun, Code2, FileCode } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -234,35 +235,12 @@ const Index = () => {
             />
             
             {generatedContent && (
-              <div className="mt-8 max-w-4xl mx-auto">
-                <div className="rounded-2xl border border-white/10 bg-[#1a1a1a] p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      {generatedContent.type === "web" ? (
-                        <Code2 className="h-5 w-5 text-primary" />
-                      ) : (
-                        <FileCode className="h-5 w-5 text-primary" />
-                      )}
-                      <h3 className="text-lg font-semibold text-white">
-                        {generatedContent.type === "web" ? "Generated Web Page" : "Generated Smart Contract"}
-                      </h3>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(generatedContent.code);
-                        toast({ title: "Copied to clipboard" });
-                      }}
-                      className="border-white/10 text-white hover:bg-white/10"
-                    >
-                      Copy Code
-                    </Button>
-                  </div>
-                  <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5">
-                    <code>{generatedContent.code}</code>
-                  </pre>
-                </div>
+              <div className="mt-8 max-w-7xl mx-auto">
+                <PreviewPanel
+                  code={generatedContent.code}
+                  type={generatedContent.type}
+                  metadata={generatedContent.metadata}
+                />
               </div>
             )}
           </div>
