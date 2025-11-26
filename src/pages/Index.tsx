@@ -4,6 +4,7 @@ import { ProjectSidebar } from "@/components/builder/ProjectSidebar";
 import { CanvasPreview } from "@/components/builder/CanvasPreview";
 import { ChatPanel } from "@/components/builder/ChatPanel";
 import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
+import { ContractGenerator } from "@/components/builder/ContractGenerator";
 import { ModelType } from "@/components/builder/SettingsDialog";
 
 export interface Page {
@@ -21,6 +22,7 @@ export interface Component {
 }
 
 const Index = () => {
+  const [mode, setMode] = useState<"web" | "contract">("web");
   const [pages, setPages] = useState<Page[]>([
     { id: "1", name: "Home", path: "/", content: "<div class='p-8'><h1 class='text-4xl font-bold mb-4'>Welcome to Your Website</h1><p class='text-lg text-gray-600'>Start building with AI</p></div>" },
   ]);
@@ -159,28 +161,38 @@ const Index = () => {
   };
 
   return (
-    <BuilderLayout onSettingsChange={setSelectedModel}>
-      <ProjectSidebar
-        pages={pages}
-        currentPageId={currentPageId}
-        onPageSelect={setCurrentPageId}
-        onAddPage={handleAddPage}
-        onDeletePage={handleDeletePage}
-        onOpenLibrary={() => setIsLibraryOpen(true)}
-      />
-      
-      <CanvasPreview content={currentPage?.content || ""} />
-      
-      <ChatPanel
-        prompts={prompts}
-        onSubmit={handlePromptSubmit}
-        isGenerating={isGenerating}
-      />
+    <BuilderLayout 
+      onSettingsChange={setSelectedModel} 
+      mode={mode}
+      onModeChange={setMode}
+    >
+      {mode === "web" ? (
+        <>
+          <ProjectSidebar
+            pages={pages}
+            currentPageId={currentPageId}
+            onPageSelect={setCurrentPageId}
+            onAddPage={handleAddPage}
+            onDeletePage={handleDeletePage}
+            onOpenLibrary={() => setIsLibraryOpen(true)}
+          />
+          
+          <CanvasPreview content={currentPage?.content || ""} />
+          
+          <ChatPanel
+            prompts={prompts}
+            onSubmit={handlePromptSubmit}
+            isGenerating={isGenerating}
+          />
 
-      <ComponentLibrary
-        isOpen={isLibraryOpen}
-        onClose={() => setIsLibraryOpen(false)}
-      />
+          <ComponentLibrary
+            isOpen={isLibraryOpen}
+            onClose={() => setIsLibraryOpen(false)}
+          />
+        </>
+      ) : (
+        <ContractGenerator model={selectedModel} />
+      )}
     </BuilderLayout>
   );
 };
