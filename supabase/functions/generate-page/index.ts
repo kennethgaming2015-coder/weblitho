@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [] } = await req.json();
+    const { prompt, conversationHistory = [], model } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
     if (!LOVABLE_API_KEY) {
@@ -57,7 +57,7 @@ Generate production-ready, visually stunning HTML that uses Tailwind classes eff
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: model || "google/gemini-2.5-flash",
         messages,
         stream: true,
       }),
