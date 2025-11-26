@@ -25,6 +25,7 @@ export interface Component {
 const Index = () => {
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ModelType>(
     (localStorage.getItem("ai_model") as ModelType) || "gemini-2.0-flash-exp"
   );
@@ -35,6 +36,7 @@ const Index = () => {
     metadata?: any;
   } | null>(null);
   const { toast } = useToast();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -53,6 +55,19 @@ const Index = () => {
     return contractKeywords.some(keyword => lowerPrompt.includes(keyword)) ? "contract" : "web";
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsGenerating(false);
+    setGenerationStatus("");
+    toast({
+      title: "Generation Stopped",
+      description: "AI generation has been cancelled",
+    });
+  };
+
   const handleMessageSubmit = async (message: string, files?: File[], model?: ModelType) => {
     const userMessage = files && files.length > 0 
       ? `${message}\n\n[${files.length} file(s) attached]`
@@ -60,11 +75,17 @@ const Index = () => {
     
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     setIsGenerating(true);
+    setGenerationStatus("Analyzing your request...");
+    
+    // Create new abort controller for this generation
+    abortControllerRef.current = new AbortController();
     
     try {
       const intentType = detectIntentType(message);
       
       if (intentType === "contract") {
+        setGenerationStatus("Generating smart contract...");
+        
         // Generate smart contract
         const { data, error } = await supabase.functions.invoke("generate-contract", {
           body: {
@@ -72,6 +93,7 @@ const Index = () => {
             contractType: "auto", // Let AI decide based on prompt
             model: model || selectedModel,
           },
+          signal: abortControllerRef.current.signal,
         });
 
         if (error) throw error;
@@ -80,11 +102,15 @@ const Index = () => {
         setMessages(prev => [...prev, { role: "assistant", content: assistantMessage }]);
         setGeneratedContent({ type: "contract", code: data.solidity_code, metadata: data });
         
+        setGenerationStatus("Contract generated successfully!");
+        
         toast({
           title: "Contract Generated",
           description: `${data.contract_name} is ready for deployment`,
         });
       } else {
+        setGenerationStatus("Generating web page...");
+        
         // Generate web page - streaming
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
         
@@ -99,6 +125,7 @@ const Index = () => {
             conversationHistory: messages,
             model: model || selectedModel,
           }),
+          signal: abortControllerRef.current.signal,
         });
 
         if (!resp.ok) {
@@ -112,6 +139,8 @@ const Index = () => {
         }
 
         if (!resp.body) throw new Error("No response body");
+
+        setGenerationStatus("Streaming response...");
 
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
@@ -155,6 +184,9 @@ const Index = () => {
                   };
                   return newMessages;
                 });
+                
+                // Update preview in real-time
+                setGeneratedContent({ type: "web", code: assistantSoFar });
               }
             } catch {
               textBuffer = line + "\n" + textBuffer;
@@ -163,7 +195,7 @@ const Index = () => {
           }
         }
 
-        setGeneratedContent({ type: "web", code: assistantSoFar });
+        setGenerationStatus("Generation complete!");
         
         toast({
           title: "Page Generated",
@@ -171,12 +203,19 @@ const Index = () => {
         });
       }
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log("Generation aborted by user");
+        return;
+      }
+      
       console.error("Error:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       setMessages(prev => [...prev, { 
         role: "assistant", 
         content: `Sorry, I encountered an error: ${errorMessage}` 
       }]);
+      
+      setGenerationStatus("");
       
       toast({
         title: "Generation Failed",
@@ -185,6 +224,8 @@ const Index = () => {
       });
     } finally {
       setIsGenerating(false);
+      setGenerationStatus("");
+      abortControllerRef.current = null;
     }
   };
 
@@ -224,8 +265,9 @@ const Index = () => {
           onModelChange={handleModelChange}
         />
       ) : (
-        <main className="pt-16">
-          <div className="container mx-auto px-4 py-8">
+        <main className="fixed inset-0 pt-16 flex">
+          {/* Chat Panel - Left Side */}
+          <div className="w-[480px] border-r border-white/10 bg-[#0a0a0a] flex flex-col">
             <ChatInterface
               messages={messages}
               onSubmit={handleMessageSubmit}
@@ -234,13 +276,44 @@ const Index = () => {
               onModelChange={handleModelChange}
             />
             
-            {generatedContent && (
-              <div className="mt-8 max-w-7xl mx-auto">
+            {/* Generation Status */}
+            {isGenerating && generationStatus && (
+              <div className="px-4 py-3 border-t border-white/10 bg-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                  <span className="text-sm text-white/70">{generationStatus}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Stop Button */}
+            {isGenerating && (
+              <div className="px-4 py-3 border-t border-white/10">
+                <Button 
+                  onClick={handleStop}
+                  variant="destructive"
+                  className="w-full"
+                  size="sm"
+                >
+                  Stop Generating
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Preview Panel - Right Side */}
+          <div className="flex-1 overflow-auto bg-[#0a0a0a]">
+            {generatedContent ? (
+              <div className="h-full">
                 <PreviewPanel
                   code={generatedContent.code}
                   type={generatedContent.type}
                   metadata={generatedContent.metadata}
                 />
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-white/40">
+                <p>Waiting for generation...</p>
               </div>
             )}
           </div>
