@@ -1,8 +1,17 @@
-import { Moon, Sun, Code2, Play, Settings } from "lucide-react";
+import { Moon, Sun, Code2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
+import { SettingsDialog, AIProvider, ModelType } from "./SettingsDialog";
 
-export const Header = () => {
+interface HeaderProps {
+  onSettingsChange: (settings: {
+    provider: AIProvider;
+    model: ModelType;
+    apiKey?: string;
+  }) => void;
+}
+
+export const Header = ({ onSettingsChange }: HeaderProps) => {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
@@ -29,9 +38,7 @@ export const Header = () => {
           <Play className="h-4 w-4 mr-2" />
           Preview
         </Button>
-        <Button variant="ghost" size="sm">
-          <Settings className="h-4 w-4" />
-        </Button>
+        <SettingsDialog onSettingsChange={onSettingsChange} />
         <Button variant="ghost" size="sm" onClick={toggleTheme}>
           {theme === "dark" ? (
             <Sun className="h-4 w-4" />
