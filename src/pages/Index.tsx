@@ -27,7 +27,7 @@ const Index = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ModelType>(
-    (localStorage.getItem("ai_model") as ModelType) || "gemini-2.0-flash-exp"
+    (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.5-flash"
   );
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [generatedContent, setGeneratedContent] = useState<{
@@ -257,7 +257,7 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      {messages.length === 0 ? (
+      {!isGenerating && messages.length === 0 ? (
         <ChatHero 
           onSubmit={handleMessageSubmit}
           isGenerating={isGenerating}

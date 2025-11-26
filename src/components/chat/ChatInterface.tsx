@@ -94,7 +94,7 @@ export const ChatInterface = ({
               </div>
               <div>
                 <h3 className="font-semibold text-sm">QubeAI Assistant</h3>
-                <p className="text-xs text-muted-foreground">Powered by {selectedModel.includes('gemini-2.5') ? 'Advanced AI' : 'QubeAI 2.0'}</p>
+                <p className="text-xs text-muted-foreground">Powered by QubeAI 2.5</p>
               </div>
             </div>
             
@@ -117,11 +117,9 @@ export const ChatInterface = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gemini-2.0-flash-exp">QubeAI 2.0 Flash (Fastest)</SelectItem>
-                  <SelectItem value="gemini-1.5-pro">QubeAI 2.0 Pro (Balanced)</SelectItem>
-                  <SelectItem value="gemini-1.5-flash">QubeAI 2.0 Flash 1.5</SelectItem>
-                  <SelectItem value="google/gemini-2.5-flash">Advanced Flash</SelectItem>
-                  <SelectItem value="google/gemini-2.5-pro">Advanced Pro</SelectItem>
+                  <SelectItem value="google/gemini-2.5-flash">QubeAI 2.5 Flash (Recommended)</SelectItem>
+                  <SelectItem value="google/gemini-2.5-pro">QubeAI 2.5 Pro (Premium)</SelectItem>
+                  <SelectItem value="google/gemini-2.5-flash-lite">QubeAI 2.5 Flash Lite (Fast)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
