@@ -60,8 +60,8 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+  --background: 0 0% 7%;
+  --foreground: 0 0% 98%;
 
     --card: 224 71% 6%;
     --card-foreground: 213 31% 91%;
@@ -161,6 +161,24 @@ All colors MUST be HSL.
     animation: fade-in 0.3s ease-out;
   }
 
+  .animate-scale-in {
+    animation: scale-in 0.3s ease-out;
+  }
+
+  /* Lovable-style gradient hero background */
+  .hero-gradient {
+    background: radial-gradient(ellipse 120% 80% at 50% 0%, 
+      hsl(230, 100%, 25%) 0%, 
+      hsl(240, 90%, 20%) 20%,
+      hsl(260, 100%, 25%) 40%,
+      hsl(280, 95%, 30%) 55%,
+      hsl(320, 100%, 35%) 70%,
+      hsl(340, 100%, 40%) 82%,
+      hsl(10, 100%, 50%) 95%,
+      hsl(25, 100%, 60%) 100%);
+    position: relative;
+  }
+
   @keyframes slide-up {
     from {
       opacity: 0;
@@ -178,6 +196,17 @@ All colors MUST be HSL.
     }
     to {
       opacity: 1;
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
     }
   }
 }
