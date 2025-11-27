@@ -4,11 +4,22 @@ import { ChatHero } from "@/components/chat/ChatHero";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { PreviewPanel } from "@/components/preview/PreviewPanel";
 import { ModelType } from "@/components/builder/SettingsDialog";
-import { Moon, Sun, Sparkles, LogOut } from "lucide-react";
+import { Moon, Sun, Sparkles, LogOut, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export interface Page {
   id: string;
@@ -90,6 +101,21 @@ const Index = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/auth");
+  };
+
+  const handleClearHistory = () => {
+    setMessages([]);
+    setGeneratedContent(null);
+    localStorage.removeItem("qubeai_messages");
+    localStorage.removeItem("qubeai_generated_content");
+    toast({
+      title: "History cleared",
+      description: "All chat history and generated content have been cleared",
+    });
+  };
+
+  const handleNewProject = () => {
+    handleClearHistory();
   };
 
   if (!user) {
@@ -278,25 +304,68 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       {/* Header */}
-      <header className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-xl">
-        <div className="container flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-sm">Q</span>
+      <header className="fixed top-0 z-50 w-full border-b border-white/10 bg-[#0a0a0a]/95 backdrop-blur-xl">
+        <div className="container flex h-14 items-center justify-between px-4">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-sm">Q</span>
+              </div>
+              <span className="font-bold text-base text-white">QubeAI</span>
             </div>
-            <span className="font-bold text-lg text-white">QubeAI</span>
+            
+            {messages.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleNewProject}
+                  className="text-white/60 hover:text-white hover:bg-white/10 h-8"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Project
+                </Button>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="text-white/60 hover:text-white hover:bg-white/10 h-8"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-[#1a1a1a] border-white/10">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-white">Clear chat history?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-white/60">
+                        This will delete all messages and generated content. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10">Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearHistory} className="bg-destructive hover:bg-destructive/90">
+                        Clear History
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-white/60 hover:text-white hover:bg-white/10">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10">
               {theme === "dark" ? (
-                <Sun className="h-5 w-5" />
+                <Sun className="h-4 w-4" />
               ) : (
-                <Moon className="h-5 w-5" />
+                <Moon className="h-4 w-4" />
               )}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="text-white/60 hover:text-white hover:bg-white/10">
-              <LogOut className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="h-8 w-8 text-white/60 hover:text-white hover:bg-white/10">
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -311,9 +380,17 @@ const Index = () => {
           onModelChange={handleModelChange}
         />
       ) : (
-        <main className="fixed inset-0 pt-16 flex">
+        <main className="fixed inset-0 pt-14 flex bg-gradient-to-b from-[#0a0a0a] to-[#0d0d0d]">
           {/* Chat Panel - Left Side */}
-          <div className="w-[480px] border-r border-white/10 bg-[#0a0a0a] flex flex-col">
+          <div className="w-[420px] border-r border-white/10 bg-[#0a0a0a]/50 backdrop-blur-xl flex flex-col animate-slide-in-right">
+            {/* Chat Header */}
+            <div className="px-4 py-3 border-b border-white/5 bg-gradient-to-r from-orange-500/10 to-purple-600/10">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-pulse" />
+                <span className="text-sm font-medium text-white">AI Assistant</span>
+              </div>
+            </div>
+
             <ChatInterface
               messages={messages}
               onSubmit={handleMessageSubmit}
@@ -324,21 +401,24 @@ const Index = () => {
             
             {/* Generation Status */}
             {isGenerating && generationStatus && (
-              <div className="px-4 py-3 border-t border-white/10 bg-white/5">
+              <div className="px-4 py-3 border-t border-white/10 bg-gradient-to-r from-orange-500/5 to-purple-600/5 backdrop-blur-xl animate-fade-in">
                 <div className="flex items-center gap-3">
-                  <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                  <span className="text-sm text-white/70">{generationStatus}</span>
+                  <div className="relative">
+                    <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                    <div className="absolute inset-0 h-2 w-2 rounded-full bg-orange-500 animate-ping" />
+                  </div>
+                  <span className="text-sm text-white/80 font-medium">{generationStatus}</span>
                 </div>
               </div>
             )}
             
             {/* Stop Button */}
             {isGenerating && (
-              <div className="px-4 py-3 border-t border-white/10">
+              <div className="px-4 py-3 border-t border-white/10 bg-[#0a0a0a]/50 animate-fade-in">
                 <Button 
                   onClick={handleStop}
                   variant="destructive"
-                  className="w-full"
+                  className="w-full shadow-lg shadow-destructive/20"
                   size="sm"
                 >
                   Stop Generating
@@ -348,9 +428,9 @@ const Index = () => {
           </div>
 
           {/* Preview Panel - Right Side */}
-          <div className="flex-1 overflow-auto bg-[#0a0a0a]">
+          <div className="flex-1 overflow-hidden bg-[#0d0d0d]">
             {generatedContent ? (
-              <div className="h-full">
+              <div className="h-full p-4 animate-fade-in">
                 <PreviewPanel
                   code={generatedContent.code}
                   type={generatedContent.type}
@@ -358,12 +438,15 @@ const Index = () => {
                 />
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center space-y-3">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/5">
-                    <Sparkles className="h-6 w-6 text-white/40" />
+              <div className="h-full flex items-center justify-center animate-fade-in">
+                <div className="text-center space-y-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/10 to-purple-600/10 border border-white/5">
+                    <Sparkles className="h-8 w-8 text-white/40" />
                   </div>
-                  <p className="text-sm text-white/40">Preview will appear here</p>
+                  <div className="space-y-2">
+                    <p className="text-base font-medium text-white/60">Your creation will appear here</p>
+                    <p className="text-sm text-white/40">Start by describing what you want to build</p>
+                  </div>
                 </div>
               </div>
             )}
