@@ -27,7 +27,10 @@ export interface Component {
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>(() => {
+    const saved = localStorage.getItem("qubeai_messages");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ModelType>(
@@ -38,7 +41,10 @@ const Index = () => {
     type: "web" | "contract";
     code: string;
     metadata?: any;
-  } | null>(null);
+  } | null>(() => {
+    const saved = localStorage.getItem("qubeai_generated_content");
+    return saved ? JSON.parse(saved) : null;
+  });
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -60,6 +66,18 @@ const Index = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Persist messages to localStorage
+  useEffect(() => {
+    localStorage.setItem("qubeai_messages", JSON.stringify(messages));
+  }, [messages]);
+
+  // Persist generated content to localStorage
+  useEffect(() => {
+    if (generatedContent) {
+      localStorage.setItem("qubeai_generated_content", JSON.stringify(generatedContent));
+    }
+  }, [generatedContent]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
