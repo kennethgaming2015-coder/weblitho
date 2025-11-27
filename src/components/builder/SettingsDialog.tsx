@@ -23,7 +23,11 @@ import { useToast } from "@/hooks/use-toast";
 export type ModelType = 
   | "google/gemini-2.5-flash" 
   | "google/gemini-2.5-pro" 
-  | "google/gemini-2.5-flash-lite";
+  | "google/gemini-2.5-flash-lite"
+  | "x-ai/grok-4.1-fast:free"
+  | "kwaipilot/kat-coder-pro:free"
+  | "deepseek/deepseek-r1:free"
+  | "meta-llama/llama-3.3-70b-instruct:free";
 
 interface SettingsDialogProps {
   onSettingsChange: (model: ModelType) => void;
@@ -47,6 +51,14 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
       ? "QubeAI 2.5 Pro" 
       : model.includes("2.5-flash-lite")
       ? "QubeAI 2.5 Flash Lite"
+      : model.includes("grok")
+      ? "Grok 4.1 Fast"
+      : model.includes("kat-coder")
+      ? "Kat Coder Pro"
+      : model.includes("deepseek")
+      ? "DeepSeek R1"
+      : model.includes("llama")
+      ? "Llama 3.3 70B"
       : "QubeAI 2.5 Flash";
     
     toast({
@@ -121,6 +133,50 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
                       <span className="font-semibold">QubeAI 2.5 Flash Lite</span>
                       <span className="text-xs text-muted-foreground">
                         💨 Fastest generation for simple projects
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="x-ai/grok-4.1-fast:free">
+                    <div className="flex flex-col items-start gap-1 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Grok 4.1 Fast</span>
+                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        🤖 Fast OpenRouter model by X.AI
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="kwaipilot/kat-coder-pro:free">
+                    <div className="flex flex-col items-start gap-1 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Kat Coder Pro</span>
+                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        💻 Specialized coding model via OpenRouter
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="deepseek/deepseek-r1:free">
+                    <div className="flex flex-col items-start gap-1 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">DeepSeek R1</span>
+                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        🧠 Advanced reasoning model via OpenRouter
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">
+                    <div className="flex flex-col items-start gap-1 py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Llama 3.3 70B</span>
+                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        🦙 Meta's powerful open-source model
                       </span>
                     </div>
                   </SelectItem>
