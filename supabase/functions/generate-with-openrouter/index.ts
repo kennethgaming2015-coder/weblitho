@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [] } = await req.json();
+    const { prompt, conversationHistory = [], model = "x-ai/grok-4.1-fast:free" } = await req.json();
     const OPENROUTER_KEY = Deno.env.get('OPENROUTER_KEY');
 
     if (!OPENROUTER_KEY) {
@@ -46,7 +46,7 @@ Generate production-ready code that looks professional.`;
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "x-ai/grok-4.1-fast:free",
+        model,
         messages,
         stream: true
       })
