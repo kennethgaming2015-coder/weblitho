@@ -108,9 +108,13 @@ export const ChatInterface = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="google/gemini-2.5-flash">Flash (Recommended)</SelectItem>
-                <SelectItem value="google/gemini-2.5-pro">Pro (Premium)</SelectItem>
-                <SelectItem value="google/gemini-2.5-flash-lite">Flash Lite</SelectItem>
+                <SelectItem value="google/gemini-2.5-flash">QubeAI Flash (Recommended)</SelectItem>
+                <SelectItem value="google/gemini-2.5-pro">QubeAI Pro (Premium)</SelectItem>
+                <SelectItem value="google/gemini-2.5-flash-lite">QubeAI Flash Lite</SelectItem>
+                <SelectItem value="x-ai/grok-4.1-fast:free">Grok 4.1 Fast (Free)</SelectItem>
+                <SelectItem value="kwaipilot/kat-coder-pro:free">Kat Coder Pro (Free)</SelectItem>
+                <SelectItem value="deepseek/deepseek-r1:free">DeepSeek R1 (Free)</SelectItem>
+                <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Free)</SelectItem>
               </SelectContent>
             </Select>
           </div>
