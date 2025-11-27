@@ -40,88 +40,97 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#1a1a1a] overflow-hidden">
+    <div className="h-full rounded-xl border border-white/10 bg-gradient-to-b from-[#1a1a1a] to-[#0d0d0d] overflow-hidden shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10 bg-[#0d0d0d]">
+      <div className="flex items-center justify-between p-3 border-b border-white/10 bg-[#0d0d0d]/50 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           {type === "web" ? (
-            <Eye className="h-5 w-5 text-primary" />
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              <Eye className="h-4 w-4 text-white" />
+            </div>
           ) : (
-            <Code2 className="h-5 w-5 text-primary" />
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <Code2 className="h-4 w-4 text-white" />
+            </div>
           )}
-          <h3 className="text-lg font-semibold text-white">
-            {type === "web" ? "Generated Web Page" : metadata?.contract_name || "Smart Contract"}
-          </h3>
+          <div>
+            <h3 className="text-sm font-semibold text-white">
+              {type === "web" ? "Generated Web Page" : metadata?.contract_name || "Smart Contract"}
+            </h3>
+            <p className="text-xs text-white/50">
+              {type === "web" ? "Live preview" : "Solidity contract"}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleCopy}
-            className="text-white/60 hover:text-white hover:bg-white/10"
+            className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10"
           >
-            <Copy className="h-4 w-4 mr-2" />
-            Copy
+            <Copy className="h-3.5 w-3.5 mr-1.5" />
+            <span className="text-xs">Copy</span>
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleDownload}
-            className="text-white/60 hover:text-white hover:bg-white/10"
+            className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10"
           >
-            <Download className="h-4 w-4 mr-2" />
-            Download
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            <span className="text-xs">Download</span>
           </Button>
         </div>
       </div>
 
       {/* Content */}
       {type === "web" ? (
-        <Tabs defaultValue="preview" className="w-full">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#0d0d0d]">
-            <TabsList className="bg-white/5">
-              <TabsTrigger value="preview" className="data-[state=active]:bg-white/10">
-                <Eye className="h-4 w-4 mr-2" />
+        <Tabs defaultValue="preview" className="w-full h-[calc(100%-4rem)]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#0d0d0d]/30">
+            <TabsList className="bg-white/5 h-8">
+              <TabsTrigger value="preview" className="data-[state=active]:bg-white/10 text-xs">
+                <Eye className="h-3 w-3 mr-1.5" />
                 Preview
               </TabsTrigger>
-              <TabsTrigger value="code" className="data-[state=active]:bg-white/10">
-                <Code2 className="h-4 w-4 mr-2" />
+              <TabsTrigger value="code" className="data-[state=active]:bg-white/10 text-xs">
+                <Code2 className="h-3 w-3 mr-1.5" />
                 Code
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <Button
                 variant={viewport === "mobile" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewport("mobile")}
-                className={viewport === "mobile" ? "" : "text-white/60 hover:text-white hover:bg-white/10"}
+                className={`h-7 w-7 p-0 ${viewport === "mobile" ? "bg-white/10" : "text-white/60 hover:text-white hover:bg-white/10"}`}
               >
-                <Smartphone className="h-4 w-4" />
+                <Smartphone className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant={viewport === "tablet" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewport("tablet")}
-                className={viewport === "tablet" ? "" : "text-white/60 hover:text-white hover:bg-white/10"}
+                className={`h-7 w-7 p-0 ${viewport === "tablet" ? "bg-white/10" : "text-white/60 hover:text-white hover:bg-white/10"}`}
               >
-                <Tablet className="h-4 w-4" />
+                <Tablet className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant={viewport === "desktop" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewport("desktop")}
-                className={viewport === "desktop" ? "" : "text-white/60 hover:text-white hover:bg-white/10"}
+                className={`h-7 w-7 p-0 ${viewport === "desktop" ? "bg-white/10" : "text-white/60 hover:text-white hover:bg-white/10"}`}
               >
-                <Monitor className="h-4 w-4" />
+                <Monitor className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
 
-          <TabsContent value="preview" className="p-6 bg-[#0d0d0d] m-0">
-            <div className="flex items-center justify-center min-h-[600px]">
+          <TabsContent value="preview" className="p-4 bg-[#0d0d0d] m-0 h-full overflow-auto">
+            <div className="flex items-center justify-center min-h-full">
               <div
-                className="bg-white rounded-lg shadow-2xl transition-all duration-300 overflow-hidden"
+                className="bg-white rounded-lg shadow-2xl transition-all duration-300 overflow-hidden border border-white/10"
                 style={{
                   width: viewportDimensions[viewport].width,
                   height: viewportDimensions[viewport].height,
@@ -138,8 +147,8 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
             </div>
           </TabsContent>
 
-          <TabsContent value="code" className="p-6 m-0">
-            <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[600px] overflow-y-auto scrollbar-thin">
+          <TabsContent value="code" className="p-4 m-0 h-full overflow-auto">
+            <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-xs text-white/80 border border-white/5 h-full scrollbar-thin">
               <code>{code}</code>
             </pre>
           </TabsContent>

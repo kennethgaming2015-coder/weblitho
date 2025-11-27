@@ -84,11 +84,11 @@ export const ChatInterface = ({
   return (
     <div className="h-full flex flex-col">
       {/* Clean Header */}
-      <div className="flex-shrink-0 px-4 py-3 border-b border-white/5 bg-[#0a0a0a]">
+      <div className="flex-shrink-0 px-4 py-2 border-b border-white/5 bg-[#0a0a0a]/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            <span className="text-xs text-white/60">QubeAI 2.5</span>
+            <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 shadow-lg shadow-green-500/20" />
+            <span className="text-xs text-white/60 font-medium">Active</span>
           </div>
             
           <Button
@@ -102,19 +102,19 @@ export const ChatInterface = ({
         </div>
 
         {showModelSelector && (
-          <div className="mt-3 px-3 py-2 bg-white/5 rounded-lg animate-fade-in">
+          <div className="mt-2 animate-fade-in">
             <Select value={selectedModel} onValueChange={(value) => onModelChange(value as ModelType)}>
-              <SelectTrigger className="h-8 text-xs bg-transparent border-white/10">
+              <SelectTrigger className="h-8 text-xs bg-white/5 border-white/10 text-white">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="google/gemini-2.5-flash">QubeAI Flash (Recommended)</SelectItem>
-                <SelectItem value="google/gemini-2.5-pro">QubeAI Pro (Premium)</SelectItem>
+                <SelectItem value="google/gemini-2.5-flash">QubeAI Flash</SelectItem>
+                <SelectItem value="google/gemini-2.5-pro">QubeAI Pro</SelectItem>
                 <SelectItem value="google/gemini-2.5-flash-lite">QubeAI Flash Lite</SelectItem>
-                <SelectItem value="x-ai/grok-4.1-fast:free">Grok 4.1 Fast (Free)</SelectItem>
-                <SelectItem value="kwaipilot/kat-coder-pro:free">Kat Coder Pro (Free)</SelectItem>
-                <SelectItem value="deepseek/deepseek-r1:free">DeepSeek R1 (Free)</SelectItem>
-                <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Free)</SelectItem>
+                <SelectItem value="x-ai/grok-4.1-fast:free">Grok 4.1 Fast</SelectItem>
+                <SelectItem value="kwaipilot/kat-coder-pro:free">Kat Coder Pro</SelectItem>
+                <SelectItem value="deepseek/deepseek-r1:free">DeepSeek R1</SelectItem>
+                <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -122,31 +122,31 @@ export const ChatInterface = ({
       </div>
 
       {/* Messages Area - Clean & Minimal */}
-      <ScrollArea className="flex-1 px-4" ref={scrollRef}>
-        <div className="py-4 space-y-4 max-w-2xl">
+      <ScrollArea className="flex-1 px-3" ref={scrollRef}>
+        <div className="py-3 space-y-3">
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`flex gap-3 ${
+              className={`flex gap-2 ${
                 message.role === "user" ? "justify-end" : "justify-start"
-              }`}
+              } animate-fade-in`}
             >
               {message.role === "assistant" && (
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center">
+                <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-purple-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
                   <Sparkles className="h-3 w-3 text-white" />
                 </div>
               )}
               <div
-                className={`max-w-[75%] rounded-xl px-3 py-2 ${
+                className={`max-w-[80%] rounded-xl px-3 py-2 ${
                   message.role === "user"
-                    ? "bg-white/10 text-white"
+                    ? "bg-white/10 text-white border border-white/10"
                     : "bg-white/5 text-white/90 border border-white/5"
                 }`}
               >
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                <p className="text-xs leading-relaxed whitespace-pre-wrap">{message.content}</p>
               </div>
               {message.role === "user" && (
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-white/60 text-xs font-medium">
+                <div className="flex-shrink-0 w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-white/60 text-xs font-medium border border-white/10">
                   U
                 </div>
               )}
@@ -156,9 +156,9 @@ export const ChatInterface = ({
 
         {/* Quick Action Chips */}
         {messages.length > 0 && !isGenerating && (
-          <div className="pb-4 px-2">
+          <div className="pb-3 px-1 animate-fade-in">
             <p className="text-xs text-white/40 mb-2">Quick actions:</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {quickActions.map((action, index) => {
                 const Icon = action.icon;
                 return (
@@ -167,7 +167,7 @@ export const ChatInterface = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => onSubmit(action.prompt)}
-                    className="h-7 px-3 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white"
+                    className="h-7 px-2.5 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white"
                   >
                     <Icon className="h-3 w-3 mr-1.5" />
                     {action.label}
@@ -180,16 +180,16 @@ export const ChatInterface = ({
       </ScrollArea>
 
       {/* Input Area - Clean & Compact */}
-      <div className="flex-shrink-0 px-4 py-3 border-t border-white/5 bg-[#0a0a0a]">
+      <div className="flex-shrink-0 px-3 py-2 border-t border-white/5 bg-[#0a0a0a]/50">
         {files.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2">
+          <div className="mb-2 flex flex-wrap gap-1.5">
             {files.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-2 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-xs text-white/70"
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10 text-xs text-white/70"
               >
                 <FileText className="h-3 w-3 text-primary" />
-                <span className="max-w-[100px] truncate">{file.name}</span>
+                <span className="max-w-[80px] truncate">{file.name}</span>
                 <button
                   onClick={() => removeFile(index)}
                   className="hover:text-destructive transition-colors"
@@ -216,9 +216,9 @@ export const ChatInterface = ({
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={isGenerating}
-            className="h-9 w-9 shrink-0 text-white/40 hover:text-white/70 hover:bg-white/5"
+            className="h-8 w-8 shrink-0 text-white/40 hover:text-white/70 hover:bg-white/5"
           >
-            <Paperclip className="h-4 w-4" />
+            <Paperclip className="h-3.5 w-3.5" />
           </Button>
           
           <Textarea
@@ -226,20 +226,20 @@ export const ChatInterface = ({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Message QubeAI..."
-            className="min-h-[36px] max-h-[120px] resize-none bg-white/5 border-white/10 focus:border-white/20 text-sm text-white placeholder:text-white/40"
+            className="min-h-[32px] max-h-[100px] resize-none bg-white/5 border-white/10 focus:border-white/20 text-xs text-white placeholder:text-white/40 rounded-lg"
             disabled={isGenerating}
           />
           
           <Button 
             onClick={handleSubmit} 
             size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg bg-white text-black hover:bg-white/90"
+            className="h-8 w-8 shrink-0 rounded-lg bg-gradient-to-r from-orange-500 to-purple-600 text-white hover:from-orange-600 hover:to-purple-700 shadow-lg shadow-orange-500/20"
             disabled={isGenerating || (!input.trim() && files.length === 0)}
           >
             {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5" />
             )}
           </Button>
         </div>
