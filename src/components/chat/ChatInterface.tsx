@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Loader2, Paperclip, Settings2, X, FileText } from "lucide-react";
+import { Send, Sparkles, Loader2, Paperclip, Settings2, X, FileText, RotateCcw, RefreshCw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ModelType } from "@/components/builder/SettingsDialog";
+import { Badge } from "@/components/ui/badge";
 
 interface ChatInterfaceProps {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
@@ -74,11 +75,10 @@ export const ChatInterface = ({
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const quickPrompts = [
-    "Create a modern landing page with hero section",
-    "Build an ERC20 token contract",
-    "Design a dashboard with analytics",
-    "Generate an NFT collection contract",
+  const quickActions = [
+    { icon: RefreshCw, label: "Refine design", prompt: "Make the design more modern and polished with better spacing and colors" },
+    { icon: RotateCcw, label: "Change style", prompt: "Redesign this with a completely different visual style" },
+    { icon: Sparkles, label: "Add features", prompt: "Add more interactive features and animations" },
   ];
 
   return (
@@ -153,6 +153,30 @@ export const ChatInterface = ({
             </div>
           ))}
         </div>
+
+        {/* Quick Action Chips */}
+        {messages.length > 0 && !isGenerating && (
+          <div className="pb-4 px-2">
+            <p className="text-xs text-white/40 mb-2">Quick actions:</p>
+            <div className="flex flex-wrap gap-2">
+              {quickActions.map((action, index) => {
+                const Icon = action.icon;
+                return (
+                  <Button
+                    key={index}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onSubmit(action.prompt)}
+                    className="h-7 px-3 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white"
+                  >
+                    <Icon className="h-3 w-3 mr-1.5" />
+                    {action.label}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </ScrollArea>
 
       {/* Input Area - Clean & Compact */}
