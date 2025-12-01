@@ -35,6 +35,52 @@ export interface Component {
   code: string;
 }
 
+// Helper function to convert React components to HTML preview
+const convertReactToHtml = (files: Array<{ path: string; content: string }>): string => {
+  // Find the main page component
+  const pageFile = files.find(f => f.path.includes('page.tsx')) || files[0];
+  
+  if (!pageFile) {
+    return '<div style="padding: 2rem; font-family: sans-serif;">No content available</div>';
+  }
+
+  // Extract JSX from the component
+  let content = pageFile.content;
+  
+  // Remove imports
+  content = content.replace(/^import.*from.*$/gm, '');
+  
+  // Extract the return statement JSX
+  const returnMatch = content.match(/return\s*\(([\s\S]*)\);?\s*}/);
+  let jsx = returnMatch ? returnMatch[1] : content;
+  
+  // Convert React className to class
+  jsx = jsx.replace(/className=/g, 'class=');
+  
+  // Remove TypeScript types
+  jsx = jsx.replace(/:\s*\w+(\[\])?/g, '');
+  
+  // Create a full HTML document with Tailwind CSS
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generated Website</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; }
+  </style>
+</head>
+<body>
+  ${jsx}
+</body>
+</html>
+  `.trim();
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -249,8 +295,6 @@ const Index = () => {
               const content = parsed.choices?.[0]?.delta?.content as string | undefined;
               if (content) {
                 assistantSoFar += content;
-                // Update preview in real-time (but not chat)
-                setGeneratedContent({ type: "web", code: assistantSoFar });
               }
             } catch {
               textBuffer = line + "\n" + textBuffer;
@@ -258,9 +302,39 @@ const Index = () => {
             }
           }
         }
-        
-        // Add completion message to chat (without code)
-        setMessages(prev => [...prev, { role: "assistant", content: "Generated web page successfully" }]);
+
+        // Parse the final response - it should be JSON with files array
+        try {
+          const jsonResponse = JSON.parse(assistantSoFar);
+          
+          if (jsonResponse.files && Array.isArray(jsonResponse.files)) {
+            // Extract files and create HTML preview
+            const files = jsonResponse.files;
+            const mainFile = files.find((f: any) => f.path.includes('page.tsx')) || files[0];
+            
+            // Create a simple HTML preview by extracting JSX content
+            const htmlPreview = convertReactToHtml(files);
+            
+            setGeneratedContent({ 
+              type: "web", 
+              code: htmlPreview,
+              metadata: { files, structure: 'nextjs' }
+            });
+            
+            setMessages(prev => [...prev, { 
+              role: "assistant", 
+              content: `Generated a modern Next.js website with ${files.length} component${files.length > 1 ? 's' : ''}` 
+            }]);
+          } else {
+            // Fallback: treat as HTML
+            setGeneratedContent({ type: "web", code: assistantSoFar });
+            setMessages(prev => [...prev, { role: "assistant", content: "Generated web page successfully" }]);
+          }
+        } catch (parseError) {
+          // If not JSON, treat as raw HTML
+          setGeneratedContent({ type: "web", code: assistantSoFar });
+          setMessages(prev => [...prev, { role: "assistant", content: "Generated web page successfully" }]);
+        }
 
         setGenerationStatus("Generation complete!");
         
