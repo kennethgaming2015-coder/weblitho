@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, Layers, FileCode, ChevronRight, ChevronDown } from "lucide-react";
+import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ContractInteraction } from "@/components/web3/ContractInteraction";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface PreviewPanelProps {
   code: string;
@@ -22,11 +21,7 @@ const viewportDimensions = {
 
 export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const files = metadata?.files || [];
-  const hasMultipleFiles = files.length > 0;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -34,30 +29,14 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
   };
 
   const handleDownload = () => {
-    if (hasMultipleFiles) {
-      // Download all files as a zip would be ideal, but for now just download the main file
-      const mainFile = files[0];
-      const blob = new Blob([mainFile.content], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = mainFile.path.split('/').pop() || "index.tsx";
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ 
-        title: "Downloaded main file", 
-        description: `${files.length} files in this project. Check the Code tab to view all.` 
-      });
-    } else {
-      const blob = new Blob([code], { type: type === "web" ? "text/html" : "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = type === "web" ? "index.html" : `${metadata?.contract_name || "contract"}.sol`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({ title: "Downloaded successfully" });
-    }
+    const blob = new Blob([code], { type: type === "web" ? "text/html" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = type === "web" ? "index.html" : `${metadata?.contract_name || "contract"}.sol`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Downloaded successfully" });
   };
 
   return (
@@ -76,13 +55,10 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
           )}
           <div>
             <h3 className="text-sm font-semibold text-white">
-              {type === "web" ? (hasMultipleFiles ? "Next.js Project" : "Generated Web Page") : metadata?.contract_name || "Smart Contract"}
+              {type === "web" ? "Generated Website" : metadata?.contract_name || "Smart Contract"}
             </h3>
             <p className="text-xs text-white/50">
-              {type === "web" 
-                ? (hasMultipleFiles ? `${files.length} files • Modern React` : "Live preview")
-                : "Solidity contract"
-              }
+              {type === "web" ? "Live HTML preview" : "Solidity contract"}
             </p>
           </div>
         </div>
@@ -172,55 +148,9 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
           </TabsContent>
 
           <TabsContent value="code" className="p-4 m-0 h-full overflow-auto">
-            {hasMultipleFiles ? (
-              <div className="flex h-full gap-3">
-                {/* File Explorer */}
-                <div className="w-64 border-r border-white/10 pr-3">
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 text-xs text-white/60 mb-2">
-                      <FileCode className="h-3.5 w-3.5" />
-                      <span className="font-medium">Project Files</span>
-                    </div>
-                  </div>
-                  <ScrollArea className="h-full">
-                    <div className="space-y-1">
-                      {files.map((file: any, idx: number) => (
-                        <button
-                          key={idx}
-                          onClick={() => setSelectedFile(file.path)}
-                          className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
-                            selectedFile === file.path || (!selectedFile && idx === 0)
-                              ? 'bg-white/10 text-white'
-                              : 'text-white/60 hover:bg-white/5 hover:text-white'
-                          }`}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <FileCode className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{file.path}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-
-                {/* Code Viewer */}
-                <div className="flex-1 min-w-0">
-                  <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-xs text-white/80 border border-white/5 h-full">
-                    <code>
-                      {selectedFile 
-                        ? files.find((f: any) => f.path === selectedFile)?.content 
-                        : files[0]?.content || code
-                      }
-                    </code>
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-xs text-white/80 border border-white/5 h-full scrollbar-thin">
-                <code>{code}</code>
-              </pre>
-            )}
+            <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-xs text-white/80 border border-white/5 h-full scrollbar-thin">
+              <code>{code}</code>
+            </pre>
           </TabsContent>
         </Tabs>
       ) : (
