@@ -190,7 +190,6 @@ export const ChatHero = ({
                     <SelectItem value="google/gemini-2.5-pro">QubeAI 2.5 Pro</SelectItem>
                     <SelectItem value="google/gemini-2.5-flash-lite">QubeAI 2.5 Flash Lite</SelectItem>
                     <SelectItem value="x-ai/grok-4.1-fast:free">Grok 4.1 Fast</SelectItem>
-                    <SelectItem value="kwaipilot/kat-coder-pro:free">Kat Coder Pro</SelectItem>
                     <SelectItem value="deepseek/deepseek-r1:free">DeepSeek R1</SelectItem>
                     <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B</SelectItem>
                   </SelectContent>

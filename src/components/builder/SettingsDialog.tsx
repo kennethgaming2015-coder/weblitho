@@ -25,7 +25,6 @@ export type ModelType =
   | "google/gemini-2.5-pro" 
   | "google/gemini-2.5-flash-lite"
   | "x-ai/grok-4.1-fast:free"
-  | "kwaipilot/kat-coder-pro:free"
   | "deepseek/deepseek-r1:free"
   | "meta-llama/llama-3.3-70b-instruct:free";
 
@@ -53,8 +52,6 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
       ? "QubeAI 2.5 Flash Lite"
       : model.includes("grok")
       ? "Grok 4.1 Fast"
-      : model.includes("kat-coder")
-      ? "Kat Coder Pro"
       : model.includes("deepseek")
       ? "DeepSeek R1"
       : model.includes("llama")
@@ -144,17 +141,6 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
                       </div>
                       <span className="text-xs text-muted-foreground">
                         🤖 Fast OpenRouter model by X.AI
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="kwaipilot/kat-coder-pro:free">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Kat Coder Pro</span>
-                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        💻 Specialized coding model via OpenRouter
                       </span>
                     </div>
                   </SelectItem>

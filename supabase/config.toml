@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.generate-contract]
 verify_jwt = false
+
+[functions.validate-code]
+verify_jwt = false

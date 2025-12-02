@@ -35,6 +35,14 @@ export interface Component {
   code: string;
 }
 
+interface ValidationResult {
+  valid: boolean;
+  score: number;
+  issues: string[];
+  suggestions: string[];
+  security: string[];
+}
+
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -56,6 +64,7 @@ const Index = () => {
     const saved = localStorage.getItem("qubeai_generated_content");
     return saved ? JSON.parse(saved) : null;
   });
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -106,6 +115,7 @@ const Index = () => {
   const handleClearHistory = () => {
     setMessages([]);
     setGeneratedContent(null);
+    setValidation(null);
     localStorage.removeItem("qubeai_messages");
     localStorage.removeItem("qubeai_generated_content");
     toast({
@@ -279,6 +289,39 @@ const Index = () => {
           role: "assistant", 
           content: "Generated beautiful website successfully ✨" 
         }]);
+
+        setGenerationStatus("Validating code quality...");
+        
+        // Run validation with KatCoder Pro
+        try {
+          const validationResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-code`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({ code: assistantSoFar }),
+          });
+          
+          if (validationResp.ok) {
+            const validationResult = await validationResp.json();
+            setValidation(validationResult);
+            
+            if (validationResult.score >= 80) {
+              toast({
+                title: "✅ High Quality Code",
+                description: `Validation score: ${validationResult.score}/100`,
+              });
+            } else if (validationResult.score >= 60) {
+              toast({
+                title: "⚠️ Good Code with Suggestions",
+                description: `Validation score: ${validationResult.score}/100`,
+              });
+            }
+          }
+        } catch (validationError) {
+          console.log("Validation skipped:", validationError);
+        }
 
         setGenerationStatus("Generation complete!");
         
@@ -455,6 +498,7 @@ const Index = () => {
                   metadata={generatedContent?.metadata}
                   isGenerating={isGenerating}
                   generationStatus={generationStatus}
+                  validation={validation}
                 />
               </div>
             ) : (
