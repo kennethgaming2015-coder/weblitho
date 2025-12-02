@@ -185,7 +185,7 @@ const Index = () => {
           description: `${data.contract_name} is ready for deployment`,
         });
       } else {
-        setGenerationStatus("Generating web page...");
+        setGenerationStatus("Analyzing your request...");
         
         // Generate web page - streaming
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
@@ -216,13 +216,14 @@ const Index = () => {
 
         if (!resp.body) throw new Error("No response body");
 
-        setGenerationStatus("Streaming response...");
+        setGenerationStatus("Planning component structure...");
 
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let textBuffer = "";
         let streamDone = false;
         let assistantSoFar = "";
+        let chunkCount = 0;
 
         while (!streamDone) {
           const { done, value } = await reader.read();
@@ -249,7 +250,20 @@ const Index = () => {
               const content = parsed.choices?.[0]?.delta?.content as string | undefined;
               if (content) {
                 assistantSoFar += content;
-                // Update preview in real-time as HTML is generated
+                chunkCount++;
+                
+                // Update status based on content progress
+                if (chunkCount < 10) {
+                  setGenerationStatus("Planning component structure...");
+                } else if (chunkCount < 30) {
+                  setGenerationStatus("Writing React components...");
+                } else if (chunkCount < 60) {
+                  setGenerationStatus("Styling with Tailwind CSS...");
+                } else {
+                  setGenerationStatus("Finalizing your website...");
+                }
+                
+                // Update preview in real-time
                 setGeneratedContent({ type: "web", code: assistantSoFar });
               }
             } catch {
@@ -433,12 +447,14 @@ const Index = () => {
 
           {/* Preview Panel - Right Side */}
           <div className="flex-1 overflow-hidden bg-[#0d0d0d]">
-            {generatedContent ? (
+            {generatedContent || isGenerating ? (
               <div className="h-full animate-fade-in">
                 <PreviewPanel
-                  code={generatedContent.code}
-                  type={generatedContent.type}
-                  metadata={generatedContent.metadata}
+                  code={generatedContent?.code || ""}
+                  type={generatedContent?.type || "web"}
+                  metadata={generatedContent?.metadata}
+                  isGenerating={isGenerating}
+                  generationStatus={generationStatus}
                 />
               </div>
             ) : (
