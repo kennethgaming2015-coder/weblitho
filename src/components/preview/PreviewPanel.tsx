@@ -40,9 +40,9 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
   };
 
   return (
-    <div className="h-full rounded-xl border border-white/10 bg-gradient-to-b from-[#1a1a1a] to-[#0d0d0d] overflow-hidden shadow-2xl">
+    <div className="h-full flex flex-col bg-[#0d0d0d] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-white/10 bg-[#0d0d0d]/50 backdrop-blur-xl">
+      <div className="flex items-center justify-between p-3 border-b border-white/10 bg-[#0d0d0d]/80 backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-2">
           {type === "web" ? (
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
@@ -86,8 +86,8 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
 
       {/* Content */}
       {type === "web" ? (
-        <Tabs defaultValue="preview" className="w-full h-[calc(100%-4rem)]">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#0d0d0d]/30">
+        <Tabs defaultValue="preview" className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#0d0d0d]/30 shrink-0">
             <TabsList className="bg-white/5 h-8">
               <TabsTrigger value="preview" className="data-[state=active]:bg-white/10 text-xs">
                 <Eye className="h-3 w-3 mr-1.5" />
@@ -127,13 +127,13 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
             </div>
           </div>
 
-          <TabsContent value="preview" className="p-4 bg-[#0d0d0d] m-0 h-full overflow-auto">
-            <div className="flex items-center justify-center min-h-full">
+          <TabsContent value="preview" className="flex-1 bg-[#0d0d0d] m-0 overflow-auto p-0">
+            <div className="flex items-start justify-center min-h-full p-4">
               <div
                 className="bg-white rounded-lg shadow-2xl transition-all duration-300 overflow-hidden border border-white/10"
                 style={{
                   width: viewportDimensions[viewport].width,
-                  height: viewportDimensions[viewport].height,
+                  height: viewport === "desktop" ? "calc(100vh - 180px)" : viewportDimensions[viewport].height,
                   maxWidth: "100%",
                 }}
               >
@@ -147,7 +147,7 @@ export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
             </div>
           </TabsContent>
 
-          <TabsContent value="code" className="p-4 m-0 h-full overflow-auto">
+          <TabsContent value="code" className="flex-1 m-0 overflow-auto p-4">
             <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-xs text-white/80 border border-white/5 h-full scrollbar-thin">
               <code>{code}</code>
             </pre>

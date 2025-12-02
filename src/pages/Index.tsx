@@ -434,7 +434,7 @@ const Index = () => {
           {/* Preview Panel - Right Side */}
           <div className="flex-1 overflow-hidden bg-[#0d0d0d]">
             {generatedContent ? (
-              <div className="h-full p-4 animate-fade-in">
+              <div className="h-full animate-fade-in">
                 <PreviewPanel
                   code={generatedContent.code}
                   type={generatedContent.type}
