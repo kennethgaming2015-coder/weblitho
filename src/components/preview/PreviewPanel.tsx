@@ -1,10 +1,19 @@
 import { useState } from "react";
-import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, Layers } from "lucide-react";
+import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, Layers, Shield, CheckCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ContractInteraction } from "@/components/web3/ContractInteraction";
 import { GenerationLoader } from "./GenerationLoader";
+import { Badge } from "@/components/ui/badge";
+
+interface ValidationResult {
+  valid: boolean;
+  score: number;
+  issues: string[];
+  suggestions: string[];
+  security: string[];
+}
 
 interface PreviewPanelProps {
   code: string;
@@ -12,6 +21,7 @@ interface PreviewPanelProps {
   metadata?: any;
   isGenerating?: boolean;
   generationStatus?: string;
+  validation?: ValidationResult | null;
 }
 
 type ViewportSize = "mobile" | "tablet" | "desktop";
@@ -22,7 +32,7 @@ const viewportDimensions = {
   desktop: { width: "100%", height: "100%" },
 };
 
-export const PreviewPanel = ({ code, type, metadata, isGenerating = false, generationStatus = "" }: PreviewPanelProps) => {
+export const PreviewPanel = ({ code, type, metadata, isGenerating = false, generationStatus = "", validation }: PreviewPanelProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const { toast } = useToast();
 
@@ -47,11 +57,17 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
     toast({ title: "Downloaded successfully" });
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-green-400 bg-green-500/10 border-green-500/30";
+    if (score >= 60) return "text-yellow-400 bg-yellow-500/10 border-yellow-500/30";
+    return "text-red-400 bg-red-500/10 border-red-500/30";
+  };
+
   return (
     <div className="h-full flex flex-col bg-[#0d0d0d] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-white/10 bg-[#0d0d0d]/80 backdrop-blur-xl shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {type === "web" ? (
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
               <Eye className="h-4 w-4 text-white" />
@@ -66,9 +82,20 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
               {type === "web" ? "Generated Website" : metadata?.contract_name || "Smart Contract"}
             </h3>
             <p className="text-xs text-white/50">
-              {type === "web" ? "Live HTML preview" : "Solidity contract"}
+              {type === "web" ? "React + Tailwind CSS" : "Solidity contract"}
             </p>
           </div>
+          {/* Validation Badge */}
+          {validation && (
+            <Badge className={`ml-2 ${getScoreColor(validation.score)} border`}>
+              {validation.score >= 80 ? (
+                <CheckCircle className="h-3 w-3 mr-1" />
+              ) : (
+                <AlertTriangle className="h-3 w-3 mr-1" />
+              )}
+              Score: {validation.score}
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button
