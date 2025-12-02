@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ContractInteraction } from "@/components/web3/ContractInteraction";
+import { GenerationLoader } from "./GenerationLoader";
 
 interface PreviewPanelProps {
   code: string;
   type: "web" | "contract";
   metadata?: any;
+  isGenerating?: boolean;
+  generationStatus?: string;
 }
 
 type ViewportSize = "mobile" | "tablet" | "desktop";
@@ -19,9 +22,14 @@ const viewportDimensions = {
   desktop: { width: "100%", height: "100%" },
 };
 
-export const PreviewPanel = ({ code, type, metadata }: PreviewPanelProps) => {
+export const PreviewPanel = ({ code, type, metadata, isGenerating = false, generationStatus = "" }: PreviewPanelProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const { toast } = useToast();
+
+  // Show loading screen when generating
+  if (isGenerating && (!code || code.length < 500)) {
+    return <GenerationLoader status={generationStatus} isGenerating={isGenerating} />;
+  }
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
