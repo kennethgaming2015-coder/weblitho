@@ -12,11 +12,12 @@ import { VersionHistory } from "@/components/builder/VersionHistory";
 import { TemplateGallery } from "@/components/builder/TemplateGallery";
 import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
-import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save } from "lucide-react";
+import { PagesPanel } from "@/components/builder/PagesPanel";
+import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useProjects, ProjectFile, Project } from "@/hooks/useProjects";
+import { useProjects, ProjectFile, Project, ProjectPage } from "@/hooks/useProjects";
 import type { User } from "@supabase/supabase-js";
 import {
   AlertDialog,
@@ -78,6 +79,9 @@ const Index = () => {
   const [projectName, setProjectName] = useState<string>("Untitled Project");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [pages, setPages] = useState<ProjectPage[]>([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
+  const [activePage, setActivePage] = useState<string>('home');
+  const [showPagesPanel, setShowPagesPanel] = useState(true);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -116,6 +120,16 @@ const Index = () => {
         }));
         setMessages(typedHistory);
         setSelectedModel((project.selected_model as ModelType) || "google/gemini-2.0-flash");
+        
+        // Load pages from project
+        if (project.pages && project.pages.length > 0) {
+          setPages(project.pages);
+          setActivePage(project.pages[0].id);
+        } else {
+          setPages([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
+          setActivePage('home');
+        }
+        
         if (project.preview || (project.files && project.files.length > 0)) {
           setGeneratedContent({
             type: "web",
@@ -195,7 +209,40 @@ const Index = () => {
     setGeneratedContent(null);
     setValidation(null);
     setProjectName("Untitled Project");
+    setPages([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
+    setActivePage('home');
     setSearchParams({});
+  };
+
+  // Page management handlers
+  const handleAddPage = (page: Omit<ProjectPage, 'id'>) => {
+    const newPage: ProjectPage = {
+      ...page,
+      id: `page-${Date.now()}`,
+    };
+    setPages(prev => [...prev, newPage]);
+    setActivePage(newPage.id);
+    toast({ title: "Page added", description: `${page.name} page created` });
+  };
+
+  const handleDeletePage = (pageId: string) => {
+    setPages(prev => prev.filter(p => p.id !== pageId));
+    if (activePage === pageId) {
+      setActivePage('home');
+    }
+    toast({ title: "Page deleted" });
+  };
+
+  const handleRenamePage = (pageId: string, name: string) => {
+    setPages(prev => prev.map(p => p.id === pageId ? { ...p, name } : p));
+  };
+
+  const handlePageSelect = (pageId: string) => {
+    setActivePage(pageId);
+    const page = pages.find(p => p.id === pageId);
+    if (page) {
+      toast({ title: `Switched to ${page.name}` });
+    }
   };
 
   if (!user) {
@@ -655,6 +702,20 @@ const Index = () => {
             )}
           </div>
 
+          {/* Pages Panel - Side Panel */}
+          {showPagesPanel && (generatedContent?.preview || isGenerating) && (
+            <div className="w-[180px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
+              <PagesPanel
+                pages={pages}
+                activePage={activePage}
+                onPageSelect={handlePageSelect}
+                onAddPage={handleAddPage}
+                onDeletePage={handleDeletePage}
+                onRenamePage={handleRenamePage}
+              />
+            </div>
+          )}
+
           {/* File Tree - Side Panel */}
           {showFileTree && (generatedContent?.preview || isGenerating) && (
             <div className="w-[220px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
@@ -678,8 +739,18 @@ const Index = () => {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setShowPagesPanel(!showPagesPanel)}
+                    className={`h-8 w-8 p-0 rounded-lg ${showPagesPanel ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+                    title="Toggle Pages"
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowFileTree(!showFileTree)}
-                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-lg"
+                    className={`h-8 w-8 p-0 rounded-lg ${showFileTree ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+                    title="Toggle File Tree"
                   >
                     {showFileTree ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
                   </Button>
