@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ChatHero } from "@/components/chat/ChatHero";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { PreviewPanel } from "@/components/preview/PreviewPanel";
@@ -8,10 +8,12 @@ import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
 import { FileTree } from "@/components/builder/FileTree";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { ExportOptions } from "@/components/builder/ExportOptions";
-import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye } from "lucide-react";
+import { VersionHistory } from "@/components/builder/VersionHistory";
+import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useProjects, ProjectFile } from "@/hooks/useProjects";
 import type { User } from "@supabase/supabase-js";
 import {
   AlertDialog,
@@ -47,11 +49,6 @@ interface ValidationResult {
   security: string[];
 }
 
-interface ProjectFile {
-  path: string;
-  content: string;
-}
-
 interface GeneratedProject {
   type: "web";
   preview: string; // HTML for iframe preview
@@ -61,27 +58,26 @@ interface GeneratedProject {
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const projectId = searchParams.get("project");
+  
   const [user, setUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>(() => {
-    const saved = localStorage.getItem("qubeai_messages");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<ModelType>(
-    (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.0-flash"
-  );
+  const [selectedModel, setSelectedModel] = useState<ModelType>("google/gemini-2.0-flash");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
-  const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(() => {
-    const saved = localStorage.getItem("qubeai_generated_content");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showFileTree, setShowFileTree] = useState(true);
   const [selectedFileView, setSelectedFileView] = useState<{ name: string; content: string } | null>(null);
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
+  const [projectName, setProjectName] = useState<string>("Untitled Project");
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  const { projects, createProject, updateProject, getProjectVersions, restoreVersion } = useProjects();
 
   // Check authentication
   useEffect(() => {
@@ -102,21 +98,69 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Persist messages to localStorage
+  // Load project from database if projectId is in URL
   useEffect(() => {
-    localStorage.setItem("qubeai_messages", JSON.stringify(messages));
-  }, [messages]);
-
-  // Persist generated content to localStorage
-  useEffect(() => {
-    if (generatedContent) {
-      localStorage.setItem("qubeai_generated_content", JSON.stringify(generatedContent));
+    if (projectId && projects.length > 0) {
+      const project = projects.find(p => p.id === projectId);
+      if (project) {
+        setProjectName(project.name);
+        // Cast chat history roles to correct type
+        const typedHistory = (project.chat_history || []).map(msg => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+        }));
+        setMessages(typedHistory);
+        setSelectedModel((project.selected_model as ModelType) || "google/gemini-2.0-flash");
+        if (project.preview || (project.files && project.files.length > 0)) {
+          setGeneratedContent({
+            type: "web",
+            preview: project.preview || "",
+            files: project.files || [],
+          });
+        }
+      }
     }
-  }, [generatedContent]);
+  }, [projectId, projects]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+  
+  // Auto-save project after generation
+  const saveProject = useCallback(async (preview: string, files: ProjectFile[], chatHistory: Array<{ role: string; content: string }>) => {
+    if (!user) return;
+    
+    setIsSaving(true);
+    try {
+      if (projectId) {
+        // Update existing project
+        await updateProject(projectId, {
+          preview,
+          files,
+          chat_history: chatHistory,
+          selected_model: selectedModel,
+        }, true, `Updated via generation`);
+      } else {
+        // Create new project
+        const newProject = await createProject({
+          name: "Untitled Project",
+          preview,
+          files,
+          chat_history: chatHistory,
+          selected_model: selectedModel,
+        });
+        if (newProject) {
+          setSearchParams({ project: newProject.id });
+          setProjectName(newProject.name);
+        }
+      }
+      toast({ title: "Project saved", description: "Your project has been saved automatically" });
+    } catch (error) {
+      console.error("Failed to save project:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, projectId, selectedModel, updateProject, createProject, setSearchParams, toast]);
 
   const toggleTheme = () => {
     setTheme(prev => prev === "dark" ? "light" : "dark");
@@ -131,16 +175,22 @@ const Index = () => {
     setMessages([]);
     setGeneratedContent(null);
     setValidation(null);
-    localStorage.removeItem("qubeai_messages");
-    localStorage.removeItem("qubeai_generated_content");
+    setProjectName("Untitled Project");
+    // Navigate away from current project
+    setSearchParams({});
     toast({
       title: "History cleared",
       description: "All chat history and generated content have been cleared",
     });
   };
 
-  const handleNewProject = () => {
-    handleClearHistory();
+  const handleNewProject = async () => {
+    // Create a new empty project and navigate to it
+    setMessages([]);
+    setGeneratedContent(null);
+    setValidation(null);
+    setProjectName("Untitled Project");
+    setSearchParams({});
   };
 
   if (!user) {
@@ -312,10 +362,12 @@ const Index = () => {
           preview: finalPreview,
           files: finalFiles
         });
-        setMessages(prev => [...prev, { 
-          role: "assistant", 
+        
+        const updatedMessages = [...messages, { role: "user" as const, content: userMessage }, { 
+          role: "assistant" as const, 
           content: "Generated beautiful website successfully ✨" 
-        }]);
+        }];
+        setMessages(updatedMessages);
 
         setGenerationStatus("Weblitho Validator checking code...");
         
@@ -354,6 +406,11 @@ const Index = () => {
         } catch (validationError) {
           console.log("Weblitho Validator skipped:", validationError);
         }
+
+        setGenerationStatus("Saving project...");
+        
+        // Auto-save project
+        await saveProject(finalPreview, finalFiles, updatedMessages);
 
         setGenerationStatus("Generation complete!");
         
@@ -399,12 +456,26 @@ const Index = () => {
       <header className="fixed top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2.5">
+            <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
               <div className="h-8 w-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg glow-cyan">
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <span className="font-bold text-lg text-foreground">Weblitho</span>
-            </div>
+            </Link>
+            
+            {/* Project name indicator */}
+            {projectId && (
+              <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+                <span>/</span>
+                <span className="font-medium text-foreground">{projectName}</span>
+                {isSaving && (
+                  <span className="text-xs text-primary animate-pulse flex items-center gap-1">
+                    <Save className="h-3 w-3" />
+                    Saving...
+                  </span>
+                )}
+              </div>
+            )}
             
             {messages.length > 0 && (
               <div className="flex items-center gap-1.5">
@@ -421,6 +492,12 @@ const Index = () => {
                 </Button>
                 
                 <ExportOptions code={generatedContent?.preview || ""} files={generatedContent?.files} />
+                
+                <VersionHistory 
+                  projectId={projectId}
+                  onGetVersions={getProjectVersions}
+                  onRestore={restoreVersion}
+                />
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -453,6 +530,15 @@ const Index = () => {
           </div>
           
           <div className="flex items-center gap-1.5">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate("/dashboard")}
+              className="text-muted-foreground hover:text-foreground hover:bg-white/10 h-8 gap-2"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden md:inline">Dashboard</span>
+            </Button>
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-lg">
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
