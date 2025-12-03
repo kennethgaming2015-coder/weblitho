@@ -47,6 +47,18 @@ interface ValidationResult {
   security: string[];
 }
 
+interface ProjectFile {
+  path: string;
+  content: string;
+}
+
+interface GeneratedProject {
+  type: "web";
+  preview: string; // HTML for iframe preview
+  files: ProjectFile[]; // Next.js files for export
+  metadata?: any;
+}
+
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -60,11 +72,7 @@ const Index = () => {
     (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.0-flash"
   );
   const [theme, setTheme] = useState<"light" | "dark">("dark");
-  const [generatedContent, setGeneratedContent] = useState<{
-    type: "web";
-    code: string;
-    metadata?: any;
-  } | null>(() => {
+  const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(() => {
     const saved = localStorage.getItem("qubeai_generated_content");
     return saved ? JSON.parse(saved) : null;
   });
@@ -170,8 +178,8 @@ const Index = () => {
         // Generate web page - streaming
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
         
-        // Include current code for modifications
-        const currentCode = generatedContent?.type === "web" ? generatedContent.code : null;
+        // Include current code for modifications (use preview HTML)
+        const currentCode = generatedContent?.type === "web" ? generatedContent.preview : null;
         
         const resp = await fetch(CHAT_URL, {
           method: "POST",
@@ -247,8 +255,31 @@ const Index = () => {
                   setGenerationStatus("Finalizing your website...");
                 }
                 
-                // Update preview in real-time
-                setGeneratedContent({ type: "web", code: assistantSoFar });
+                // Try to extract preview HTML for real-time preview
+                // Look for HTML in the streamed content
+                const htmlMatch = assistantSoFar.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);
+                if (htmlMatch) {
+                  setGeneratedContent({ 
+                    type: "web", 
+                    preview: htmlMatch[0],
+                    files: []
+                  });
+                } else {
+                  // Try to extract from JSON preview field
+                  const previewMatch = assistantSoFar.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*}|$)/);
+                  if (previewMatch) {
+                    try {
+                      const previewHtml = JSON.parse('"' + previewMatch[1] + '"');
+                      setGeneratedContent({ 
+                        type: "web", 
+                        preview: previewHtml,
+                        files: []
+                      });
+                    } catch {
+                      // Keep showing partial content
+                    }
+                  }
+                }
               }
             } catch {
               textBuffer = line + "\n" + textBuffer;
@@ -257,8 +288,30 @@ const Index = () => {
           }
         }
 
-        // Final update with complete HTML
-        setGeneratedContent({ type: "web", code: assistantSoFar });
+        // Parse final output - try JSON first, fallback to HTML
+        let finalPreview = "";
+        let finalFiles: ProjectFile[] = [];
+        
+        try {
+          // Try to parse as JSON with files and preview
+          const jsonOutput = JSON.parse(assistantSoFar);
+          if (jsonOutput.preview && jsonOutput.files) {
+            finalPreview = jsonOutput.preview;
+            finalFiles = jsonOutput.files;
+          } else if (typeof jsonOutput === "string") {
+            finalPreview = jsonOutput;
+          }
+        } catch {
+          // Not JSON, treat as HTML directly
+          const htmlMatch = assistantSoFar.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+          finalPreview = htmlMatch ? htmlMatch[0] : assistantSoFar;
+        }
+
+        setGeneratedContent({ 
+          type: "web", 
+          preview: finalPreview,
+          files: finalFiles
+        });
         setMessages(prev => [...prev, { 
           role: "assistant", 
           content: "Generated beautiful website successfully ✨" 
@@ -367,7 +420,7 @@ const Index = () => {
                   <span className="hidden md:inline">New</span>
                 </Button>
                 
-                <ExportOptions code={generatedContent?.code || ""} />
+                <ExportOptions code={generatedContent?.preview || ""} files={generatedContent?.files} />
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -459,10 +512,11 @@ const Index = () => {
           </div>
 
           {/* File Tree - Side Panel */}
-          {showFileTree && (generatedContent?.code || isGenerating) && (
+          {showFileTree && (generatedContent?.preview || isGenerating) && (
             <div className="w-[220px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
               <FileTree 
-                code={generatedContent?.code || ""} 
+                code={generatedContent?.preview || ""} 
+                files={generatedContent?.files}
                 onFileSelect={(name, content) => {
                   setSelectedFileView({ name, content });
                   setViewMode("code");
@@ -474,7 +528,7 @@ const Index = () => {
           {/* Preview Panel - Right Side */}
           <div className="flex-1 overflow-hidden bg-card/20 flex flex-col">
             {/* Toolbar with View Toggle */}
-            {(generatedContent?.code || isGenerating) && (
+            {(generatedContent?.preview || isGenerating) && (
               <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-card/50 backdrop-blur-xl shrink-0">
                 <div className="flex items-center gap-2">
                   <Button
@@ -518,8 +572,7 @@ const Index = () => {
               {isGenerating ? (
                 <div className="h-full animate-fade-in">
                   <PreviewPanel
-                    code={generatedContent?.code || ""}
-                    type="web"
+                    code={generatedContent?.preview || ""}
                     isGenerating={isGenerating}
                     generationStatus={generationStatus}
                     validation={null}
@@ -529,8 +582,7 @@ const Index = () => {
                 <div className="h-full animate-fade-in">
                   {viewMode === "preview" ? (
                     <PreviewPanel
-                      code={generatedContent.code}
-                      type={generatedContent.type}
+                      code={generatedContent.preview}
                       metadata={generatedContent.metadata}
                       isGenerating={false}
                       generationStatus=""
@@ -539,7 +591,7 @@ const Index = () => {
                   ) : (
                     <CodeViewer 
                       fileName={selectedFileView?.name || "index.html"} 
-                      content={selectedFileView?.content || generatedContent.code}
+                      content={selectedFileView?.content || generatedContent.preview}
                       language={selectedFileView?.name?.split('.').pop() || "html"}
                     />
                   )}
