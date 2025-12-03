@@ -498,9 +498,10 @@ const Index = () => {
 
         setGenerationStatus("Saving project...");
         
-        // Calculate and deduct credits based on output length
+        // Calculate and deduct credits based on output length and model
         const outputLength = finalPreview.length;
-        const creditCost = calculateCost(outputLength);
+        const usedModel = model || selectedModel;
+        const creditCost = calculateCost(outputLength, usedModel);
         const deducted = await deductCredits(creditCost, `Generated: ${message.slice(0, 50)}...`, projectId || undefined);
         
         if (!deducted) {
