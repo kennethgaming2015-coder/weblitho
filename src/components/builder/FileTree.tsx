@@ -239,7 +239,6 @@ const convertProjectFilesToTree = (files: ProjectFile[]): ExtractedFile[] => {
     
     parts.forEach((part, index) => {
       if (index === parts.length - 1) {
-        // It's a file
         current.push({
           name: part,
           type: "file",
@@ -248,7 +247,6 @@ const convertProjectFilesToTree = (files: ProjectFile[]): ExtractedFile[] => {
           lines: file.content.split('\n').length
         });
       } else {
-        // It's a folder
         let folder = current.find(f => f.name === part && f.type === "folder");
         if (!folder) {
           folder = { name: part, type: "folder", language: "", children: [] };
@@ -262,7 +260,17 @@ const convertProjectFilesToTree = (files: ProjectFile[]): ExtractedFile[] => {
   return root;
 };
 
+interface TreeNodeProps {
+  node: ExtractedFile;
+  depth: number;
+  selectedFile: string | null;
+  onSelect: (name: string, content: string) => void;
+}
 
+const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
+  const [isOpen, setIsOpen] = useState(depth === 0);
+
+  const handleClick = () => {
     if (node.type === "folder") {
       setIsOpen(!isOpen);
     } else if (node.content) {
@@ -344,13 +352,6 @@ export const FileTree = ({ code, files, onFileSelect }: FileTreeProps) => {
     }
     return extractCodeStructure(code);
   }, [code, files]);
-
-  const handleFileSelect = (name: string, content: string) => {
-    setSelectedFile(name);
-    onFileSelect?.(name, content);
-  };
-
-  return (
 
   const handleFileSelect = (name: string, content: string) => {
     setSelectedFile(name);
