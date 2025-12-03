@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, Layers, Shield, CheckCircle, AlertTriangle } from "lucide-react";
+import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, CheckCircle, AlertTriangle, Maximize2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -39,7 +39,6 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
   // Clean code - extract HTML content, strip any reasoning/thinking tokens
   const cleanCode = (() => {
     if (!code) return "";
-    // Find the start of HTML document
     const htmlStart = code.indexOf("<!DOCTYPE html>");
     const htmlAltStart = code.indexOf("<html");
     const startIndex = htmlStart !== -1 ? htmlStart : htmlAltStart;
@@ -47,23 +46,23 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
     return code.slice(startIndex);
   })();
 
-  // Check if code is complete (has closing html tag)
   const isCodeComplete = cleanCode && cleanCode.includes("</html>");
 
-  // Show loading screen when generating and code is not yet complete
   if (isGenerating && !isCodeComplete) {
     return <GenerationLoader status={generationStatus} isGenerating={isGenerating} />;
   }
 
-  // If not generating and no valid code, show placeholder
   if (!isGenerating && !cleanCode) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#0d0d0d]">
+      <div className="h-full flex items-center justify-center bg-card/30">
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/10 to-purple-600/10 border border-white/5">
-            <Eye className="h-8 w-8 text-white/40" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20">
+            <Eye className="h-8 w-8 text-primary/60" />
           </div>
-          <p className="text-sm text-white/40">No preview available</p>
+          <div>
+            <p className="text-sm font-medium text-white/60">Preview Area</p>
+            <p className="text-xs text-muted-foreground">Your creation will appear here</p>
+          </div>
         </div>
       </div>
     );
@@ -82,65 +81,56 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
     a.download = type === "web" ? "index.html" : `${metadata?.contract_name || "contract"}.sol`;
     a.click();
     URL.revokeObjectURL(url);
-    toast({ title: "Downloaded successfully" });
+    toast({ title: "Downloaded" });
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-400 bg-green-500/10 border-green-500/30";
-    if (score >= 60) return "text-yellow-400 bg-yellow-500/10 border-yellow-500/30";
-    return "text-red-400 bg-red-500/10 border-red-500/30";
+  const getScoreBadge = (score: number) => {
+    if (score >= 90) return { color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", label: "Excellent" };
+    if (score >= 80) return { color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30", label: "Great" };
+    if (score >= 70) return { color: "bg-amber-500/10 text-amber-400 border-amber-500/30", label: "Good" };
+    return { color: "bg-red-500/10 text-red-400 border-red-500/30", label: "Needs Work" };
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#0d0d0d] overflow-hidden">
+    <div className="h-full flex flex-col bg-card/30 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-white/10 bg-[#0d0d0d]/80 backdrop-blur-xl shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-card/50 backdrop-blur-xl shrink-0">
         <div className="flex items-center gap-3">
-          {type === "web" ? (
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-              <Eye className="h-4 w-4 text-white" />
-            </div>
-          ) : (
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <Code2 className="h-4 w-4 text-white" />
-            </div>
-          )}
+          <div className={`h-9 w-9 rounded-xl flex items-center justify-center shadow-lg ${
+            type === "web" 
+              ? "bg-gradient-to-br from-cyan-500 to-blue-500" 
+              : "bg-gradient-to-br from-violet-500 to-purple-500"
+          }`}>
+            {type === "web" ? <Eye className="h-4 w-4 text-white" /> : <Code2 className="h-4 w-4 text-white" />}
+          </div>
           <div>
             <h3 className="text-sm font-semibold text-white">
-              {type === "web" ? "Generated Website" : metadata?.contract_name || "Smart Contract"}
+              {type === "web" ? "Live Preview" : metadata?.contract_name || "Smart Contract"}
             </h3>
-            <p className="text-xs text-white/50">
-              {type === "web" ? "React + Tailwind CSS" : "Solidity contract"}
+            <p className="text-xs text-muted-foreground">
+              {type === "web" ? "React + Tailwind CSS" : "Solidity"}
             </p>
           </div>
+          
           {/* Validation Badge */}
           {validation && (
-            <Badge className={`ml-2 ${getScoreColor(validation.score)} border`}>
+            <Badge className={`ml-2 ${getScoreBadge(validation.score).color} border`}>
               {validation.score >= 80 ? (
                 <CheckCircle className="h-3 w-3 mr-1" />
               ) : (
                 <AlertTriangle className="h-3 w-3 mr-1" />
               )}
-              Score: {validation.score}
+              {validation.score}/100
             </Badge>
           )}
         </div>
+        
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCopy}
-            className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10"
-          >
+          <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 px-2.5 text-muted-foreground hover:text-white hover:bg-white/10">
             <Copy className="h-3.5 w-3.5 mr-1.5" />
             <span className="text-xs">Copy</span>
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDownload}
-            className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10"
-          >
+          <Button variant="ghost" size="sm" onClick={handleDownload} className="h-8 px-2.5 text-muted-foreground hover:text-white hover:bg-white/10">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             <span className="text-xs">Download</span>
           </Button>
@@ -150,53 +140,44 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
       {/* Content */}
       {type === "web" ? (
         <Tabs defaultValue="preview" className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#0d0d0d]/30 shrink-0">
-            <TabsList className="bg-white/5 h-8">
-              <TabsTrigger value="preview" className="data-[state=active]:bg-white/10 text-xs">
-                <Eye className="h-3 w-3 mr-1.5" />
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-card/30 shrink-0">
+            <TabsList className="bg-white/5 h-9 p-1">
+              <TabsTrigger value="preview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground text-xs px-3">
+                <Eye className="h-3.5 w-3.5 mr-1.5" />
                 Preview
               </TabsTrigger>
-              <TabsTrigger value="code" className="data-[state=active]:bg-white/10 text-xs">
-                <Code2 className="h-3 w-3 mr-1.5" />
+              <TabsTrigger value="code" className="data-[state=active]:bg-white/10 text-xs px-3">
+                <Code2 className="h-3.5 w-3.5 mr-1.5" />
                 Code
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex gap-1">
-              <Button
-                variant={viewport === "mobile" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewport("mobile")}
-                className={`h-7 w-7 p-0 ${viewport === "mobile" ? "bg-white/10" : "text-white/60 hover:text-white hover:bg-white/10"}`}
-              >
-                <Smartphone className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant={viewport === "tablet" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewport("tablet")}
-                className={`h-7 w-7 p-0 ${viewport === "tablet" ? "bg-white/10" : "text-white/60 hover:text-white hover:bg-white/10"}`}
-              >
-                <Tablet className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant={viewport === "desktop" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewport("desktop")}
-                className={`h-7 w-7 p-0 ${viewport === "desktop" ? "bg-white/10" : "text-white/60 hover:text-white hover:bg-white/10"}`}
-              >
-                <Monitor className="h-3.5 w-3.5" />
-              </Button>
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              {(["mobile", "tablet", "desktop"] as ViewportSize[]).map((size) => {
+                const icons = { mobile: Smartphone, tablet: Tablet, desktop: Monitor };
+                const Icon = icons[size];
+                return (
+                  <Button
+                    key={size}
+                    variant={viewport === size ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewport(size)}
+                    className={`h-7 w-7 p-0 ${viewport === size ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </Button>
+                );
+              })}
             </div>
           </div>
 
-          <TabsContent value="preview" className="flex-1 bg-[#0d0d0d] m-0 overflow-auto p-0">
-            <div className="flex items-start justify-center min-h-full p-4">
+          <TabsContent value="preview" className="flex-1 m-0 overflow-auto p-4 bg-[#0a0a0a]">
+            <div className="flex items-start justify-center min-h-full">
               <div
-                className="bg-white rounded-lg shadow-2xl transition-all duration-300 overflow-hidden border border-white/10"
+                className="bg-white rounded-xl shadow-2xl transition-all duration-500 overflow-hidden border border-white/10"
                 style={{
                   width: viewportDimensions[viewport].width,
-                  height: viewport === "desktop" ? "calc(100vh - 180px)" : viewportDimensions[viewport].height,
+                  height: viewport === "desktop" ? "calc(100vh - 220px)" : viewportDimensions[viewport].height,
                   maxWidth: "100%",
                 }}
               >
@@ -211,56 +192,39 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
           </TabsContent>
 
           <TabsContent value="code" className="flex-1 m-0 overflow-auto p-4">
-            <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-xs text-white/80 border border-white/5 h-full scrollbar-thin">
-              <code>{code}</code>
+            <pre className="glass rounded-xl p-4 overflow-x-auto text-xs text-white/80 h-full scrollbar-thin">
+              <code>{cleanCode}</code>
             </pre>
           </TabsContent>
         </Tabs>
       ) : (
-        <Tabs defaultValue="code" className="w-full">
-          <div className="flex items-center px-4 py-2 border-b border-white/10 bg-[#0d0d0d]">
-            <TabsList className="bg-white/5">
-              <TabsTrigger value="code" className="data-[state=active]:bg-white/10">
-                <Code2 className="h-4 w-4 mr-2" />
+        <Tabs defaultValue="code" className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex items-center px-4 py-2.5 border-b border-border/50 bg-card/30">
+            <TabsList className="bg-white/5 h-9 p-1">
+              <TabsTrigger value="code" className="data-[state=active]:bg-white/10 text-xs px-3">
+                <Code2 className="h-3.5 w-3.5 mr-1.5" />
                 Code
               </TabsTrigger>
-              <TabsTrigger value="interact" className="data-[state=active]:bg-white/10">
-                <Layers className="h-4 w-4 mr-2" />
+              <TabsTrigger value="interact" className="data-[state=active]:bg-white/10 text-xs px-3">
+                <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                 Interact
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="code" className="p-6 m-0">
+          <TabsContent value="code" className="flex-1 m-0 overflow-auto p-4">
             {metadata?.deployment_notes && (
-              <div className="mb-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
+              <div className="mb-4 p-4 rounded-xl glass border-primary/20">
                 <h4 className="text-sm font-semibold text-white mb-2">Deployment Notes</h4>
                 <p className="text-sm text-white/70">{metadata.deployment_notes}</p>
               </div>
             )}
-            
-            {metadata?.security_notes && (
-              <div className="mb-4 p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                <h4 className="text-sm font-semibold text-white mb-2">Security Notes</h4>
-                <p className="text-sm text-white/70">{metadata.security_notes}</p>
-              </div>
-            )}
-
-            <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[600px] overflow-y-auto scrollbar-thin">
+            <pre className="glass rounded-xl p-4 overflow-x-auto text-sm text-white/80 max-h-[600px] overflow-y-auto scrollbar-thin">
               <code>{code}</code>
             </pre>
-
-            {metadata?.abi && (
-              <div className="mt-4">
-                <h4 className="text-sm font-semibold text-white mb-2">ABI</h4>
-                <pre className="bg-[#0d0d0d] rounded-lg p-4 overflow-x-auto text-sm text-white/80 border border-white/5 max-h-[300px] overflow-y-auto scrollbar-thin">
-                  <code>{JSON.stringify(metadata.abi, null, 2)}</code>
-                </pre>
-              </div>
-            )}
           </TabsContent>
 
-          <TabsContent value="interact" className="p-6 m-0">
+          <TabsContent value="interact" className="flex-1 m-0 overflow-auto p-4">
             <ContractInteraction 
               initialAbi={metadata?.abi || ''} 
               initialAddress=""
