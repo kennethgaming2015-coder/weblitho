@@ -13,6 +13,8 @@ import { TemplateGallery } from "@/components/builder/TemplateGallery";
 import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
 import { PagesPanel } from "@/components/builder/PagesPanel";
+import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
+import { useCredits } from "@/hooks/useCredits";
 import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -87,6 +89,7 @@ const Index = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   
   const { projects, loading: projectsLoading, createProject, updateProject, deleteProject, getProjectVersions, restoreVersion } = useProjects();
+  const { credits, calculateCost, deductCredits } = useCredits();
 
   // Check authentication
   useEffect(() => {
@@ -287,6 +290,16 @@ const Index = () => {
   };
 
   const handleMessageSubmit = async (message: string, files?: File[], model?: ModelType) => {
+    // Check if user has credits before starting
+    if (!credits || credits.credits_balance <= 0) {
+      toast({
+        title: "No Credits Available",
+        description: "Please upgrade your plan to continue generating.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const userMessage = files && files.length > 0 
       ? `${message}\n\n[${files.length} file(s) attached]`
       : message;
@@ -485,6 +498,15 @@ const Index = () => {
 
         setGenerationStatus("Saving project...");
         
+        // Calculate and deduct credits based on output length
+        const outputLength = finalPreview.length;
+        const creditCost = calculateCost(outputLength);
+        const deducted = await deductCredits(creditCost, `Generated: ${message.slice(0, 50)}...`, projectId || undefined);
+        
+        if (!deducted) {
+          console.warn("Credits could not be deducted");
+        }
+        
         // Auto-save project
         await saveProject(finalPreview, finalFiles, updatedMessages);
 
@@ -646,7 +668,8 @@ const Index = () => {
             )}
           </div>
           
-          <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
+            <CreditsDisplay />
             <Button 
               variant="ghost" 
               size="sm" 
