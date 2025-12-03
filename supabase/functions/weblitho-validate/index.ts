@@ -28,10 +28,10 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      console.log("No API key available, returning default validation");
+    if (!OPENROUTER_KEY) {
+      console.log("No OpenRouter API key available, returning default validation");
       return new Response(
         JSON.stringify({
           valid: true,
@@ -71,27 +71,27 @@ Return ONLY a JSON object with this structure:
   "issues": ["array of critical issues found"],
   "suggestions": ["array of improvement suggestions"],
   "security": ["array of security concerns if any"],
-  "designQuality": "excellent" | "good" | "average" | "poor",
-  "fixedCode": "If issues found, provide corrected code snippet for the problematic section"
+  "designQuality": "excellent" | "good" | "average" | "poor"
 }
 
-Be thorough but constructive. Focus on real issues, not nitpicks.`;
+Be thorough but constructive. Focus on real issues, not nitpicks. Return ONLY JSON, no explanation.`;
 
-    console.log("Calling Weblitho Validator...");
+    console.log("Calling Weblitho Validator via OpenRouter (qwen/qwen3-coder:free)...");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": "https://weblitho.app",
+        "X-Title": "Weblitho Validator",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "qwen/qwen3-coder:free",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Validate this code:\n\n${code.substring(0, 15000)}` }
         ],
-        temperature: 0.3,
       }),
     });
 
