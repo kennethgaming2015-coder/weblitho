@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Coins, ChevronUp, History, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Coins, ChevronUp, History, TrendingUp, User, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -7,6 +8,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { useCredits, PLAN_DETAILS } from '@/hooks/useCredits';
 import { PricingDialog } from './PricingDialog';
 import { cn } from '@/lib/utils';
@@ -16,6 +18,7 @@ interface CreditsDisplayProps {
 }
 
 export function CreditsDisplay({ className }: CreditsDisplayProps) {
+  const navigate = useNavigate();
   const { credits, transactions, loading } = useCredits();
   const [pricingOpen, setPricingOpen] = useState(false);
 
@@ -107,6 +110,17 @@ export function CreditsDisplay({ className }: CreditsDisplayProps) {
             >
               <TrendingUp className="h-4 w-4" />
               Upgrade Plan
+            </Button>
+            
+            <Separator />
+            
+            <Button 
+              variant="ghost"
+              className="w-full gap-2 justify-start" 
+              onClick={() => navigate('/profile')}
+            >
+              <User className="h-4 w-4" />
+              Account Settings
             </Button>
           </div>
         </PopoverContent>
