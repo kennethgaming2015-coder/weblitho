@@ -4,7 +4,10 @@ import { ChatHero } from "@/components/chat/ChatHero";
 import { ChatInterface } from "@/components/chat/ChatInterface";
 import { PreviewPanel } from "@/components/preview/PreviewPanel";
 import { ModelType } from "@/components/builder/SettingsDialog";
-import { Moon, Sun, Sparkles, LogOut, Trash2, Plus } from "lucide-react";
+import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
+import { FileTree } from "@/components/builder/FileTree";
+import { ExportOptions } from "@/components/builder/ExportOptions";
+import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +68,7 @@ const Index = () => {
     return saved ? JSON.parse(saved) : null;
   });
   const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [showFileTree, setShowFileTree] = useState(true);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -381,6 +385,8 @@ const Index = () => {
             
             {messages.length > 0 && (
               <div className="flex items-center gap-2">
+                <ComponentLibrary onAddComponent={(prompt) => handleMessageSubmit(prompt)} />
+                
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -388,8 +394,10 @@ const Index = () => {
                   className="text-white/60 hover:text-white hover:bg-white/10 h-8"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  New Project
+                  New
                 </Button>
+                
+                <ExportOptions code={generatedContent?.code || ""} />
                 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -492,8 +500,27 @@ const Index = () => {
             )}
           </div>
 
+          {/* File Tree - Optional Side Panel */}
+          {showFileTree && generatedContent?.code && !isGenerating && (
+            <div className="w-[200px] animate-slide-in-right">
+              <FileTree code={generatedContent.code} />
+            </div>
+          )}
+
           {/* Preview Panel - Right Side */}
           <div className="flex-1 overflow-hidden bg-[#0d0d0d]">
+            {/* File tree toggle */}
+            {generatedContent?.code && !isGenerating && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowFileTree(!showFileTree)}
+                className="absolute top-16 left-[432px] z-10 h-8 w-8 p-0 text-white/40 hover:text-white hover:bg-white/10"
+              >
+                {showFileTree ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+              </Button>
+            )}
+            
             {generatedContent || isGenerating ? (
               <div className="h-full animate-fade-in">
                 <PreviewPanel
