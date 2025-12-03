@@ -44,6 +44,83 @@ export type Database = {
         }
         Relationships: []
       }
+      project_versions: {
+        Row: {
+          created_at: string
+          files: Json | null
+          id: string
+          message: string | null
+          preview: string | null
+          project_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          files?: Json | null
+          id?: string
+          message?: string | null
+          preview?: string | null
+          project_id: string
+          version_number?: number
+        }
+        Update: {
+          created_at?: string
+          files?: Json | null
+          id?: string
+          message?: string | null
+          preview?: string | null
+          project_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          chat_history: Json | null
+          created_at: string
+          description: string | null
+          files: Json | null
+          id: string
+          name: string
+          preview: string | null
+          selected_model: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_history?: Json | null
+          created_at?: string
+          description?: string | null
+          files?: Json | null
+          id?: string
+          name?: string
+          preview?: string | null
+          selected_model?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_history?: Json | null
+          created_at?: string
+          description?: string | null
+          files?: Json | null
+          id?: string
+          name?: string
+          preview?: string | null
+          selected_model?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
