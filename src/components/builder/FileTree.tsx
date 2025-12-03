@@ -16,18 +16,17 @@ interface FileTreeProps {
 }
 
 const getFileIcon = (name: string, language?: string) => {
-  if (name.endsWith(".tsx") || name.endsWith(".jsx")) return <Code2 className="h-4 w-4 text-blue-400" />;
-  if (name.endsWith(".ts") || name.endsWith(".js")) return <Braces className="h-4 w-4 text-yellow-400" />;
+  if (name.endsWith(".tsx") || name.endsWith(".jsx")) return <Code2 className="h-4 w-4 text-cyan-400" />;
+  if (name.endsWith(".ts") || name.endsWith(".js")) return <Braces className="h-4 w-4 text-amber-400" />;
   if (name.endsWith(".css") || name.endsWith(".scss")) return <FileCode className="h-4 w-4 text-pink-400" />;
   if (name.endsWith(".html")) return <FileCode className="h-4 w-4 text-orange-400" />;
-  if (name.endsWith(".json")) return <Braces className="h-4 w-4 text-green-400" />;
-  return <FileText className="h-4 w-4 text-white/60" />;
+  if (name.endsWith(".json")) return <Braces className="h-4 w-4 text-emerald-400" />;
+  return <FileText className="h-4 w-4 text-muted-foreground" />;
 };
 
 const parseCodeToFileTree = (code: string): FileNode[] => {
   const files: FileNode[] = [];
   
-  // Main HTML file
   files.push({
     name: "src",
     type: "folder",
@@ -52,7 +51,6 @@ const parseCodeToFileTree = (code: string): FileNode[] => {
     ],
   });
 
-  // Parse React components from the code
   const componentRegex = /const\s+(\w+)\s*=\s*\([^)]*\)\s*=>/g;
   const functionComponentRegex = /function\s+(\w+)\s*\(/g;
   
@@ -73,7 +71,6 @@ const parseCodeToFileTree = (code: string): FileNode[] => {
     }
   }
 
-  // Add parsed components to file tree
   const componentsFolder = files[0].children?.find(f => f.name === "components");
   if (componentsFolder && componentsFolder.children) {
     const uniqueComponents = [...new Set(components)];
@@ -87,14 +84,12 @@ const parseCodeToFileTree = (code: string): FileNode[] => {
       }
     });
 
-    // Update App.tsx lines
     const appFile = files[0].children?.find(f => f.name === "App.tsx");
     if (appFile) {
       appFile.lines = code.split("\n").length;
     }
   }
 
-  // Add config files
   files.push({
     name: "public",
     type: "folder",
@@ -133,8 +128,8 @@ const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
     <div>
       <div
         className={cn(
-          "flex items-center gap-1.5 py-1 px-2 cursor-pointer rounded-md hover:bg-white/5 transition-colors group",
-          selectedFile === node.name && "bg-orange-500/20 text-orange-400"
+          "flex items-center gap-1.5 py-1.5 px-2 cursor-pointer rounded-lg hover:bg-white/5 transition-colors group",
+          selectedFile === node.name && "bg-primary/20 text-primary"
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleClick}
@@ -142,14 +137,14 @@ const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
         {node.type === "folder" ? (
           <>
             {isOpen ? (
-              <ChevronDown className="h-3.5 w-3.5 text-white/40" />
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             ) : (
-              <ChevronRight className="h-3.5 w-3.5 text-white/40" />
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
             )}
             {isOpen ? (
-              <FolderOpen className="h-4 w-4 text-orange-400" />
+              <FolderOpen className="h-4 w-4 text-primary" />
             ) : (
-              <Folder className="h-4 w-4 text-orange-400/70" />
+              <Folder className="h-4 w-4 text-primary/70" />
             )}
           </>
         ) : (
@@ -160,12 +155,12 @@ const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
         )}
         <span className={cn(
           "text-sm truncate",
-          node.type === "folder" ? "text-white/80" : "text-white/60 group-hover:text-white/80"
+          node.type === "folder" ? "text-foreground/80" : "text-muted-foreground group-hover:text-foreground"
         )}>
           {node.name}
         </span>
         {node.lines && (
-          <span className="text-[10px] text-white/30 ml-auto">{node.lines} lines</span>
+          <span className="text-[10px] text-muted-foreground/50 ml-auto">{node.lines}</span>
         )}
       </div>
       {node.type === "folder" && isOpen && node.children && (
@@ -190,11 +185,11 @@ export const FileTree = ({ code }: FileTreeProps) => {
   const fileTree = parseCodeToFileTree(code);
 
   return (
-    <div className="h-full bg-[#0a0a0a] border-r border-white/10">
-      <div className="px-3 py-2 border-b border-white/10">
-        <h3 className="text-xs font-medium text-white/60 uppercase tracking-wider">Explorer</h3>
+    <div className="h-full bg-card/30 backdrop-blur-xl">
+      <div className="px-3 py-2.5 border-b border-border/50">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Explorer</h3>
       </div>
-      <ScrollArea className="h-[calc(100%-36px)]">
+      <ScrollArea className="h-[calc(100%-40px)]">
         <div className="py-2">
           {fileTree.map((node, index) => (
             <TreeNode
