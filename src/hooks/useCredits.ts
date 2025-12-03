@@ -31,10 +31,10 @@ export interface CreditTransaction {
 // Model credit multipliers - paid models cost more
 export const MODEL_CREDIT_MULTIPLIERS: Record<ModelType, number> = {
   "deepseek-free": 1,              // Free model - base cost
-  "google/gemini-2.0-flash": 2,    // 2x cost
-  "google/gemini-2.0-pro": 3,      // 3x cost
-  "google/gemini-2.5-flash": 2,    // 2x cost
-  "google/gemini-2.5-pro": 4,      // 4x cost (premium)
+  "google/gemini-2.0-flash": 1.5,  // 1.5x cost
+  "google/gemini-2.0-pro": 2,      // 2x cost
+  "google/gemini-2.5-flash": 1.5,  // 1.5x cost
+  "google/gemini-2.5-pro": 2.5,    // 2.5x cost (premium)
 };
 
 export const PLAN_DETAILS = {
@@ -128,16 +128,16 @@ export function useCredits() {
   }, []);
 
   const calculateCost = useCallback((outputLength: number, model?: ModelType): number => {
-    // Base cost by output length
-    let baseCost = 1;
-    if (outputLength < 2000) baseCost = 1;
-    else if (outputLength < 5000) baseCost = 2;
-    else if (outputLength < 10000) baseCost = 3;
-    else baseCost = 5;
+    // Base cost by output length (0.2 - 1.2 range)
+    let baseCost = 0.2;
+    if (outputLength < 2000) baseCost = 0.2;
+    else if (outputLength < 5000) baseCost = 0.5;
+    else if (outputLength < 10000) baseCost = 0.8;
+    else baseCost = 1.2;
     
-    // Apply model multiplier
+    // Apply model multiplier (final range: 0.2 - 3)
     const multiplier = model ? MODEL_CREDIT_MULTIPLIERS[model] || 1 : 1;
-    return Math.ceil(baseCost * multiplier);
+    return Math.round((baseCost * multiplier) * 100) / 100; // Round to 2 decimals
   }, []);
 
   const deductCredits = useCallback(async (
