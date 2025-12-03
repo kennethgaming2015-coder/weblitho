@@ -77,26 +77,29 @@ const Pricing = () => {
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="p-3 rounded-lg bg-muted/50">
-              <p className="font-medium text-primary">1 credit</p>
+              <p className="font-medium text-primary">0.2 credits</p>
               <p className="text-muted-foreground">Simple pages</p>
               <p className="text-xs text-muted-foreground/70">&lt;2K chars</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
-              <p className="font-medium text-primary">2 credits</p>
+              <p className="font-medium text-primary">0.5 credits</p>
               <p className="text-muted-foreground">Medium pages</p>
               <p className="text-xs text-muted-foreground/70">2-5K chars</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
-              <p className="font-medium text-primary">3 credits</p>
+              <p className="font-medium text-primary">0.8 credits</p>
               <p className="text-muted-foreground">Complex pages</p>
               <p className="text-xs text-muted-foreground/70">5-10K chars</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
-              <p className="font-medium text-primary">5 credits</p>
+              <p className="font-medium text-primary">1.2 credits</p>
               <p className="text-muted-foreground">Large projects</p>
               <p className="text-xs text-muted-foreground/70">&gt;10K chars</p>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            Premium models have multipliers (1.5x - 2.5x) applied to base cost
+          </p>
         </div>
 
         {/* Pricing Cards */}
