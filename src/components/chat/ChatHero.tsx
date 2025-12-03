@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { ModelType, modelConfig } from "@/components/builder/SettingsDialog";
+import { TemplateGallery } from "@/components/builder/TemplateGallery";
+import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatHeroProps {
@@ -68,13 +70,20 @@ export const ChatHero = ({
     { icon: Layout, title: "Dashboard", desc: "Analytics UI", prompt: "Build an admin dashboard with sidebar, stats cards, charts, and data tables. Modern dark theme.", gradient: "from-emerald-500 to-teal-500" },
     { icon: Box, title: "Portfolio", desc: "Creative showcase", prompt: "Design a creative portfolio with project gallery, about section, and contact form. Minimalist style.", gradient: "from-violet-500 to-purple-500" },
     { icon: Database, title: "E-commerce", desc: "Product page", prompt: "Create an e-commerce product page with image gallery, cart, reviews, and related products.", gradient: "from-amber-500 to-orange-500" },
-    { icon: FileCode, title: "Blog", desc: "Content site", prompt: "Create a modern blog with featured posts, categories, newsletter signup, and author profiles.", gradient: "from-rose-500 to-pink-500" },
-    { icon: Code, title: "Agency", desc: "Business site", prompt: "Build a creative agency website with services, team section, client testimonials, and portfolio.", gradient: "from-indigo-500 to-blue-500" },
   ];
 
   const useTemplate = (template: typeof templates[0]) => {
     setInput(template.prompt);
     toast({ title: "Template loaded", description: `${template.title} ready to customize` });
+  };
+
+  const handleTemplateSelect = (prompt: string) => {
+    setInput(prompt);
+    toast({ title: "Template loaded", description: "Ready to customize" });
+  };
+
+  const handleInsertImage = (url: string) => {
+    setInput(prev => prev + (prev ? '\n\n' : '') + `Use this image: ${url}`);
   };
 
   const currentModel = modelConfig[selectedModel] || modelConfig["google/gemini-2.0-flash"];
@@ -111,21 +120,30 @@ export const ChatHero = ({
             </p>
           </div>
 
-          {/* Templates */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 animate-slide-up delay-200">
-            {templates.map((t, i) => (
-              <Card
-                key={i}
-                onClick={() => useTemplate(t)}
-                className="group p-3 glass hover:bg-white/10 border-white/10 hover:border-white/20 cursor-pointer transition-all"
-              >
-                <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-lg`}>
-                  <t.icon className="h-4 w-4 text-white" />
-                </div>
-                <h3 className="font-medium text-white text-sm">{t.title}</h3>
-                <p className="text-xs text-white/50">{t.desc}</p>
-              </Card>
-            ))}
+          {/* Quick Templates + Buttons Row */}
+          <div className="flex flex-col md:flex-row items-center gap-4 animate-slide-up delay-200">
+            {/* Quick template cards */}
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3">
+              {templates.map((t, i) => (
+                <Card
+                  key={i}
+                  onClick={() => useTemplate(t)}
+                  className="group p-3 glass hover:bg-white/10 border-white/10 hover:border-white/20 cursor-pointer transition-all"
+                >
+                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${t.gradient} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform shadow-lg`}>
+                    <t.icon className="h-4 w-4 text-white" />
+                  </div>
+                  <h3 className="font-medium text-white text-sm">{t.title}</h3>
+                  <p className="text-xs text-white/50">{t.desc}</p>
+                </Card>
+              ))}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-row md:flex-col gap-2">
+              <TemplateGallery onSelectTemplate={handleTemplateSelect} />
+              <ImageUploadPanel onInsertImage={handleInsertImage} />
+            </div>
           </div>
 
           {/* Main Input */}
