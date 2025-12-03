@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { 
-  ArrowLeft, User, CreditCard, Mail, MapPin, Building, 
+  User, CreditCard, Mail, MapPin, Building, 
   Globe, Save, Coins, History, TrendingUp, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Footer } from "@/components/layout/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import weblithoLogo from "@/assets/weblitho-logo.png";
 
 interface ProfileData {
   id: string;
@@ -146,10 +147,9 @@ const Profile = () => {
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Button variant="ghost" onClick={() => navigate("/")} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Builder
-          </Button>
+          <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <img src={weblithoLogo} alt="Weblitho" className="h-8 w-auto" />
+          </Link>
           <h1 className="font-semibold">Account Settings</h1>
           <div className="w-24" />
         </div>
@@ -438,7 +438,6 @@ const Profile = () => {
       </main>
 
       <PricingDialog open={pricingOpen} onOpenChange={setPricingOpen} />
-      
       <Footer />
     </div>
   );

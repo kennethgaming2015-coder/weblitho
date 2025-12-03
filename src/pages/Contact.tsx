@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { ArrowLeft, Mail, MessageSquare, Send, MapPin, Clock } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Mail, MessageSquare, Send, MapPin, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Footer } from "@/components/layout/Footer";
 
 const Contact = () => {
@@ -37,17 +37,7 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <Link to="/">
-            <Button variant="ghost" className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Home
-            </Button>
-          </Link>
-        </div>
-      </header>
+      <PageHeader maxWidth="max-w-6xl" />
 
       {/* Content */}
       <main className="flex-1 max-w-6xl mx-auto px-6 py-12">

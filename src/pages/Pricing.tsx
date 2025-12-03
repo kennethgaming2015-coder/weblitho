@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Check, Sparkles, Zap, Building2, ArrowLeft, Coins } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Check, Sparkles, Zap, Building2, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCredits, PLAN_DETAILS, SubscriptionPlan } from "@/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
 import { Footer } from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
+import weblithoLogo from "@/assets/weblitho-logo.png";
 
 const planIcons = {
   free: Sparkles,
@@ -41,14 +42,9 @@ const Pricing = () => {
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Builder
-          </Button>
+          <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <img src={weblithoLogo} alt="Weblitho" className="h-8 w-auto" />
+          </Link>
           
           {credits && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10">
