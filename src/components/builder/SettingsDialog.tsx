@@ -22,20 +22,13 @@ import { useToast } from "@/hooks/use-toast";
 
 // Model type mapping - internal API models
 export type ModelType = 
-  | "google/gemini-flash-1.5"      // Weblitho Fast (FREE)
   | "google/gemini-2.0-flash"      // Weblitho 2.0
   | "google/gemini-2.0-pro"        // Weblitho 2.0 Premium
   | "google/gemini-2.5-pro"        // Weblitho 2.5 Ultra
   | "google/gemini-2.5-flash";     // Weblitho 2.5 Fast
 
 // Model display configuration
-const modelConfig: Record<ModelType, { name: string; description: string; badge?: string; badgeColor?: string }> = {
-  "google/gemini-flash-1.5": {
-    name: "Weblitho Fast",
-    description: "⚡ Free fast generation for quick projects",
-    badge: "FREE",
-    badgeColor: "bg-green-500/10 text-green-500"
-  },
+const modelConfig: Record<ModelType, { name: string; description: string; badge?: string | null; badgeColor?: string }> = {
   "google/gemini-2.0-flash": {
     name: "Weblitho 2.0",
     description: "🚀 Balanced speed and quality",
