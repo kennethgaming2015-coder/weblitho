@@ -7,8 +7,8 @@ const corsHeaders = {
 
 // Model mapping: frontend names to actual model IDs
 const MODEL_MAPPING: Record<string, { provider: "openrouter" | "lovable"; model: string }> = {
-  // Free model uses OpenRouter
-  "google/gemini-flash-1.5": { provider: "openrouter", model: "qwen/qwen3-coder:free" },
+  // Free model uses OpenRouter - DeepSeek R1 (excellent for coding/reasoning)
+  "google/gemini-flash-1.5": { provider: "openrouter", model: "deepseek/deepseek-r1-0528:free" },
   // Premium models use Lovable AI Gateway
   "google/gemini-2.0-flash": { provider: "lovable", model: "google/gemini-2.0-flash" },
   "google/gemini-2.0-pro": { provider: "lovable", model: "google/gemini-2.5-pro" },
