@@ -86,7 +86,7 @@ const Index = () => {
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  const { projects, loading: projectsLoading, createProject, updateProject, getProjectVersions, restoreVersion } = useProjects();
+  const { projects, loading: projectsLoading, createProject, updateProject, deleteProject, getProjectVersions, restoreVersion } = useProjects();
 
   // Check authentication
   useEffect(() => {
@@ -212,6 +212,19 @@ const Index = () => {
     setPages([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
     setActivePage('home');
     setSearchParams({});
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    const success = await deleteProject(projectId);
+    if (success) {
+      toast({ title: "Project deleted", description: "The project has been permanently deleted" });
+      // If we're viewing this project, clear the view
+      if (searchParams.get("project") === projectId) {
+        setMessages([]);
+        setGeneratedContent(null);
+        setSearchParams({});
+      }
+    }
   };
 
   // Page management handlers
@@ -659,6 +672,7 @@ const Index = () => {
               loading={projectsLoading}
               onOpenProject={(project: Project) => setSearchParams({ project: project.id })}
               onNewProject={handleNewProject}
+              onDeleteProject={handleDeleteProject}
             />
           </div>
         </div>
