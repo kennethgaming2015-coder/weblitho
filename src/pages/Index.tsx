@@ -77,6 +77,8 @@ const Index = () => {
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
   const [projectName, setProjectName] = useState<string>("Untitled Project");
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
   
@@ -466,11 +468,45 @@ const Index = () => {
               <span className="font-bold text-lg text-foreground">Weblitho</span>
             </Link>
             
-            {/* Project name indicator */}
+            {/* Project name indicator - editable */}
             {projectId && (
               <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
                 <span>/</span>
-                <span className="font-medium text-foreground">{projectName}</span>
+                {isEditingName ? (
+                  <input
+                    ref={nameInputRef}
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    onBlur={async () => {
+                      setIsEditingName(false);
+                      if (projectId && projectName.trim()) {
+                        await updateProject(projectId, { name: projectName.trim() });
+                        toast({ title: "Project renamed" });
+                      }
+                    }}
+                    onKeyDown={async (e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                      } else if (e.key === "Escape") {
+                        setIsEditingName(false);
+                      }
+                    }}
+                    className="font-medium text-foreground bg-transparent border-b border-primary outline-none px-1 min-w-[100px]"
+                    autoFocus
+                  />
+                ) : (
+                  <span 
+                    className="font-medium text-foreground cursor-pointer hover:text-primary transition-colors"
+                    onClick={() => {
+                      setIsEditingName(true);
+                      setTimeout(() => nameInputRef.current?.select(), 0);
+                    }}
+                    title="Click to rename"
+                  >
+                    {projectName}
+                  </span>
+                )}
                 {isSaving && (
                   <span className="text-xs text-primary animate-pulse flex items-center gap-1">
                     <Save className="h-3 w-3" />
