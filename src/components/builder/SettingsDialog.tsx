@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // Model type mapping - internal API models
 export type ModelType = 
+  | "deepseek-free"                // DeepSeek Free
   | "google/gemini-2.0-flash"      // Weblitho 2.0
   | "google/gemini-2.0-pro"        // Weblitho 2.0 Premium
   | "google/gemini-2.5-pro"        // Weblitho 2.5 Ultra
@@ -29,6 +30,12 @@ export type ModelType =
 
 // Model display configuration
 const modelConfig: Record<ModelType, { name: string; description: string; badge?: string | null; badgeColor?: string }> = {
+  "deepseek-free": {
+    name: "Weblitho Free",
+    description: "⚡ Free generation powered by DeepSeek",
+    badge: "FREE",
+    badgeColor: "bg-green-500/10 text-green-500"
+  },
   "google/gemini-2.0-flash": {
     name: "Weblitho 2.0",
     description: "🚀 Balanced speed and quality",
@@ -61,7 +68,7 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<ModelType>("google/gemini-2.0-flash");
+  const [model, setModel] = useState<ModelType>("deepseek-free");
   const { toast } = useToast();
 
   useEffect(() => {
