@@ -7,6 +7,8 @@ const corsHeaders = {
 
 // Model mapping: frontend names to actual model IDs
 const MODEL_MAPPING: Record<string, { provider: "openrouter" | "lovable"; model: string }> = {
+  // Free model uses OpenRouter - DeepSeek R1T2 Chimera
+  "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free" },
   // Premium models use Lovable AI Gateway
   "google/gemini-2.0-flash": { provider: "lovable", model: "google/gemini-2.0-flash" },
   "google/gemini-2.0-pro": { provider: "lovable", model: "google/gemini-2.5-pro" },
@@ -31,7 +33,7 @@ serve(async (req) => {
       : buildGenerationPrompt();
 
     // Get the actual model and provider
-    const modelConfig = MODEL_MAPPING[model] || { provider: "lovable", model: "google/gemini-2.0-flash" };
+    const modelConfig = MODEL_MAPPING[model] || { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free" };
     
     console.log("Weblitho generating:", {
       requestedModel: model,
