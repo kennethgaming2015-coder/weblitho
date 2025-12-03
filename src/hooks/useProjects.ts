@@ -8,6 +8,14 @@ export interface ProjectFile {
   content: string;
 }
 
+export interface ProjectPage {
+  id: string;
+  name: string;
+  path: string;
+  preview?: string;
+  icon?: string;
+}
+
 export interface Project {
   id: string;
   user_id: string;
@@ -15,6 +23,7 @@ export interface Project {
   description: string | null;
   preview: string | null;
   files: ProjectFile[];
+  pages: ProjectPage[];
   chat_history: Array<{ role: string; content: string }>;
   selected_model: string;
   created_at: string;
@@ -54,18 +63,28 @@ export const useProjects = () => {
       if (error) throw error;
       
       // Transform JSONB fields
-      const transformed: Project[] = (data || []).map(p => ({
-        id: p.id,
-        user_id: p.user_id,
-        name: p.name,
-        description: p.description,
-        preview: p.preview,
-        files: parseJsonArray<ProjectFile>(p.files as Json, []),
-        chat_history: parseJsonArray<{ role: string; content: string }>(p.chat_history as Json, []),
-        selected_model: p.selected_model || 'weblitho-fast',
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-      }));
+      const transformed: Project[] = (data || []).map(p => {
+        // Parse pages from files or create default
+        const files = parseJsonArray<ProjectFile>(p.files as Json, []);
+        const existingPages = (p as any).pages;
+        const pages: ProjectPage[] = existingPages 
+          ? parseJsonArray<ProjectPage>(existingPages as Json, [])
+          : [{ id: 'home', name: 'Home', path: '/', icon: 'home' }];
+        
+        return {
+          id: p.id,
+          user_id: p.user_id,
+          name: p.name,
+          description: p.description,
+          preview: p.preview,
+          files,
+          pages,
+          chat_history: parseJsonArray<{ role: string; content: string }>(p.chat_history as Json, []),
+          selected_model: p.selected_model || 'weblitho-fast',
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+        };
+      });
       
       setProjects(transformed);
     } catch (error) {
@@ -126,6 +145,7 @@ export const useProjects = () => {
         description: project.description,
         preview: project.preview,
         files: parseJsonArray<ProjectFile>(project.files as Json, []),
+        pages: [{ id: 'home', name: 'Home', path: '/', icon: 'home' }],
         chat_history: parseJsonArray<{ role: string; content: string }>(project.chat_history as Json, []),
         selected_model: project.selected_model || 'weblitho-fast',
         created_at: project.created_at,
