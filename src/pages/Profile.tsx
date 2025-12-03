@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useCredits, PLAN_DETAILS, MODEL_CREDIT_MULTIPLIERS } from "@/hooks/useCredits";
 import { PricingDialog } from "@/components/credits/PricingDialog";
+import { Footer } from "@/components/layout/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -437,6 +438,8 @@ const Profile = () => {
       </main>
 
       <PricingDialog open={pricingOpen} onOpenChange={setPricingOpen} />
+      
+      <Footer />
     </div>
   );
 };

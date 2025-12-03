@@ -14,6 +14,7 @@ import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
 import { PagesPanel } from "@/components/builder/PagesPanel";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
+import { Footer } from "@/components/layout/Footer";
 import { useCredits } from "@/hooks/useCredits";
 import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -711,6 +712,8 @@ const Index = () => {
               onRenameProject={handleRenameProject}
             />
           </div>
+          
+          <Footer />
         </div>
       ) : (
         <main className="fixed inset-0 pt-14 flex hero-mesh">

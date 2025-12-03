@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useProjects, Project } from '@/hooks/useProjects';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Footer } from '@/components/layout/Footer';
 import { formatDistanceToNow } from 'date-fns';
 
 const Dashboard = () => {
@@ -227,6 +228,8 @@ const Dashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <Footer />
     </div>
   );
 };

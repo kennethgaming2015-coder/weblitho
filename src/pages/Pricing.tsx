@@ -4,6 +4,7 @@ import { Check, Sparkles, Zap, Building2, ArrowLeft, Coins } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { useCredits, PLAN_DETAILS, SubscriptionPlan } from "@/hooks/useCredits";
 import { supabase } from "@/integrations/supabase/client";
+import { Footer } from "@/components/layout/Footer";
 import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
 
@@ -22,19 +23,18 @@ const Pricing = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      if (!session) {
-        navigate("/auth");
-      }
     });
-  }, [navigate]);
+  }, []);
 
   const handleUpgrade = async (plan: SubscriptionPlan) => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
     setUpgrading(plan);
     await upgradePlan(plan);
     setUpgrading(null);
   };
-
-  if (!user) return null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,8 +104,10 @@ const Pricing = () => {
 
         {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {(Object.entries(PLAN_DETAILS) as [SubscriptionPlan, typeof PLAN_DETAILS.free][]).map(([key, plan]) => {
-            const Icon = planIcons[key];
+          {(Object.entries(PLAN_DETAILS) as [SubscriptionPlan, typeof PLAN_DETAILS.free][])
+            .filter(([key]) => key !== 'owner')
+            .map(([key, plan]) => {
+            const Icon = planIcons[key as keyof typeof planIcons];
             const isCurrentPlan = credits?.plan === key;
             const isPro = key === 'pro';
 
@@ -192,6 +194,8 @@ const Pricing = () => {
           </div>
         </div>
       </main>
+      
+      <Footer />
     </div>
   );
 };

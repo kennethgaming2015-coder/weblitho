@@ -186,6 +186,7 @@ export type Database = {
           credits_balance: number
           daily_credits: number
           id: string
+          is_unlimited: boolean | null
           last_daily_reset: string | null
           last_monthly_reset: string | null
           monthly_credits: number
@@ -198,6 +199,7 @@ export type Database = {
           credits_balance?: number
           daily_credits?: number
           id?: string
+          is_unlimited?: boolean | null
           last_daily_reset?: string | null
           last_monthly_reset?: string | null
           monthly_credits?: number
@@ -210,6 +212,7 @@ export type Database = {
           credits_balance?: number
           daily_credits?: number
           id?: string
+          is_unlimited?: boolean | null
           last_daily_reset?: string | null
           last_monthly_reset?: string | null
           monthly_credits?: number
@@ -240,7 +243,7 @@ export type Database = {
       reset_daily_credits: { Args: never; Returns: undefined }
     }
     Enums: {
-      subscription_plan: "free" | "pro" | "business"
+      subscription_plan: "free" | "pro" | "business" | "owner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -368,7 +371,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      subscription_plan: ["free", "pro", "business"],
+      subscription_plan: ["free", "pro", "business", "owner"],
     },
   },
 } as const
