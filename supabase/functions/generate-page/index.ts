@@ -5,6 +5,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Model mapping: frontend names to actual model IDs
+const MODEL_MAPPING: Record<string, { provider: "openrouter" | "lovable"; model: string }> = {
+  // Free model uses OpenRouter
+  "google/gemini-flash-1.5": { provider: "openrouter", model: "qwen/qwen3-coder:free" },
+  // Premium models use Lovable AI Gateway
+  "google/gemini-2.0-flash": { provider: "lovable", model: "google/gemini-2.0-flash" },
+  "google/gemini-2.0-pro": { provider: "lovable", model: "google/gemini-2.5-pro" },
+  "google/gemini-2.5-pro": { provider: "lovable", model: "google/gemini-2.5-pro" },
+  "google/gemini-2.5-flash": { provider: "lovable", model: "google/gemini-2.5-flash" },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,10 +32,15 @@ serve(async (req) => {
       ? buildModificationPrompt(currentCode)
       : buildGenerationPrompt();
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    // Get the actual model and provider
+    const modelConfig = MODEL_MAPPING[model] || { provider: "lovable", model: "google/gemini-2.0-flash" };
+    
+    console.log("Weblitho generating:", {
+      requestedModel: model,
+      actualProvider: modelConfig.provider,
+      actualModel: modelConfig.model,
+      mode: isModification ? "MODIFICATION" : "NEW"
+    });
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -32,20 +48,49 @@ serve(async (req) => {
       { role: "user", content: prompt }
     ];
 
-    console.log("Weblitho generating with model:", model, "| Mode:", isModification ? "MODIFICATION" : "NEW");
+    let response: Response;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: true,
-      }),
-    });
+    if (modelConfig.provider === "openrouter") {
+      // Use OpenRouter API for free model
+      const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
+      if (!OPENROUTER_KEY) {
+        throw new Error("OPENROUTER_KEY is not configured");
+      }
+
+      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://weblitho.app",
+          "X-Title": "Weblitho AI Website Builder",
+        },
+        body: JSON.stringify({
+          model: modelConfig.model,
+          messages,
+          stream: true,
+        }),
+      });
+    } else {
+      // Use Lovable AI Gateway for premium models
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      if (!LOVABLE_API_KEY) {
+        throw new Error("LOVABLE_API_KEY is not configured");
+      }
+
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelConfig.model,
+          messages,
+          stream: true,
+        }),
+      });
+    }
 
     if (!response.ok) {
       if (response.status === 429) {
@@ -59,7 +104,7 @@ serve(async (req) => {
       }
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: "Payment required. Please add credits to your workspace." }),
+          JSON.stringify({ error: "Payment required. Please add credits." }),
           {
             status: 402,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -67,9 +112,9 @@ serve(async (req) => {
         );
       }
       const errorText = await response.text();
-      console.error("Weblitho AI error:", response.status, errorText);
+      console.error("AI API error:", response.status, errorText);
       return new Response(
-        JSON.stringify({ error: "AI gateway error" }),
+        JSON.stringify({ error: "AI gateway error", details: errorText }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
