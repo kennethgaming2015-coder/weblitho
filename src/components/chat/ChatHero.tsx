@@ -68,8 +68,8 @@ export const ChatHero = ({
     { icon: Layout, title: "Dashboard", desc: "Analytics UI", prompt: "Build an admin dashboard with sidebar, stats cards, charts, and data tables. Modern dark theme.", gradient: "from-emerald-500 to-teal-500" },
     { icon: Box, title: "Portfolio", desc: "Creative showcase", prompt: "Design a creative portfolio with project gallery, about section, and contact form. Minimalist style.", gradient: "from-violet-500 to-purple-500" },
     { icon: Database, title: "E-commerce", desc: "Product page", prompt: "Create an e-commerce product page with image gallery, cart, reviews, and related products.", gradient: "from-amber-500 to-orange-500" },
-    { icon: FileCode, title: "ERC20 Token", desc: "Smart contract", prompt: "Create an ERC20 token smart contract with mint, burn, and pause functions.", gradient: "from-rose-500 to-pink-500" },
-    { icon: Code, title: "NFT Collection", desc: "ERC721 contract", prompt: "Build an ERC721 NFT collection with minting, royalties, and whitelist.", gradient: "from-indigo-500 to-blue-500" },
+    { icon: FileCode, title: "Blog", desc: "Content site", prompt: "Create a modern blog with featured posts, categories, newsletter signup, and author profiles.", gradient: "from-rose-500 to-pink-500" },
+    { icon: Code, title: "Agency", desc: "Business site", prompt: "Build a creative agency website with services, team section, client testimonials, and portfolio.", gradient: "from-indigo-500 to-blue-500" },
   ];
 
   const useTemplate = (template: typeof templates[0]) => {
@@ -106,7 +106,7 @@ export const ChatHero = ({
               <span className="gradient-text">Weblitho</span>
             </h1>
             <p className="text-xl text-white/60 max-w-2xl mx-auto">
-              Create stunning websites and smart contracts in seconds using AI. 
+              Create stunning websites in seconds using AI. 
               Just describe what you want.
             </p>
           </div>
@@ -183,7 +183,7 @@ export const ChatHero = ({
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Describe your website or smart contract in detail... Be specific about design, colors, sections, and features."
+                  placeholder="Describe your website in detail... Be specific about design, colors, sections, and features."
                   className="min-h-[140px] resize-none bg-transparent border-none text-white text-base placeholder:text-white/30 focus-visible:ring-0"
                   disabled={isGenerating}
                 />

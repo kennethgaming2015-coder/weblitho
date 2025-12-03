@@ -61,7 +61,7 @@ const Index = () => {
   );
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [generatedContent, setGeneratedContent] = useState<{
-    type: "web" | "contract";
+    type: "web";
     code: string;
     metadata?: any;
   } | null>(() => {
@@ -139,15 +139,6 @@ const Index = () => {
     return null;
   }
 
-  const detectIntentType = (prompt: string): "web" | "contract" => {
-    const contractKeywords = [
-      "contract", "solidity", "smart contract", "erc20", "erc721", "erc1155", 
-      "token", "nft", "staking", "dao", "governance", "blockchain", "mint", "burn"
-    ];
-    const lowerPrompt = prompt.toLowerCase();
-    return contractKeywords.some(keyword => lowerPrompt.includes(keyword)) ? "contract" : "web";
-  };
-
   const handleStop = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -174,35 +165,7 @@ const Index = () => {
     abortControllerRef.current = new AbortController();
     
     try {
-      const intentType = detectIntentType(message);
-      
-      if (intentType === "contract") {
-        setGenerationStatus("Generating smart contract...");
-        
-        // Generate smart contract
-        const { data, error } = await supabase.functions.invoke("generate-contract", {
-          body: {
-            prompt: message,
-            contractType: "auto", // Let AI decide based on prompt
-            model: model || selectedModel,
-          },
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (error) throw error;
-
-        const assistantMessage = `Generated smart contract: **${data.contract_name}**`;
-        setMessages(prev => [...prev, { role: "assistant", content: assistantMessage }]);
-        setGeneratedContent({ type: "contract", code: data.solidity_code, metadata: data });
-        
-        setGenerationStatus("Contract generated successfully!");
-        
-        toast({
-          title: "Contract Generated",
-          description: `${data.contract_name} is ready for deployment`,
-        });
-      } else {
-        setGenerationStatus("Analyzing your request...");
+      setGenerationStatus("Analyzing your request...");
         
         // Generate web page - streaming
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
@@ -345,7 +308,6 @@ const Index = () => {
           title: "Page Generated",
           description: "Your web page is ready",
         });
-      }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         console.log("Generation aborted by user");
