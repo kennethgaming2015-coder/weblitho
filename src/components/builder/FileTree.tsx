@@ -222,13 +222,6 @@ export default defineConfig({
   return files;
 };
 
-interface TreeNodeProps {
-  node: ExtractedFile;
-  depth: number;
-  selectedFile: string | null;
-  onSelect: (name: string, content: string) => void;
-}
-
 // Convert ProjectFile[] to tree structure
 const convertProjectFilesToTree = (files: ProjectFile[]): ExtractedFile[] => {
   const root: ExtractedFile[] = [];

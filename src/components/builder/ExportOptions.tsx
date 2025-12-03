@@ -248,10 +248,17 @@ npm run build
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
       
-      const files = generateProjectFiles();
-      files.forEach(({ name, content }) => {
-        zip.file(name, content);
-      });
+      // Use provided Next.js files if available, otherwise generate from code
+      if (files && files.length > 0) {
+        files.forEach(({ path, content }) => {
+          zip.file(path, content);
+        });
+      } else {
+        const generatedFiles = generateProjectFiles();
+        generatedFiles.forEach(({ name, content }) => {
+          zip.file(name, content);
+        });
+      }
 
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);
@@ -263,7 +270,9 @@ npm run build
 
       toast({
         title: "Downloaded!",
-        description: "Your project has been downloaded as a ZIP file",
+        description: files && files.length > 0 
+          ? "Your Next.js project has been downloaded" 
+          : "Your project has been downloaded as a ZIP file",
       });
     } catch (error) {
       console.error("Download error:", error);
