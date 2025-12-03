@@ -1,7 +1,9 @@
-import { FolderOpen, Clock, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { FolderOpen, Clock, Plus, Trash2, Pencil } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { Project } from '@/hooks/useProjects';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -15,6 +17,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ProjectsGridProps {
   projects: Project[];
@@ -22,9 +32,21 @@ interface ProjectsGridProps {
   onOpenProject: (project: Project) => void;
   onNewProject: () => void;
   onDeleteProject?: (projectId: string) => void;
+  onRenameProject?: (projectId: string, newName: string) => void;
 }
 
-export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject, onDeleteProject }: ProjectsGridProps) => {
+export const ProjectsGrid = ({ 
+  projects, 
+  loading, 
+  onOpenProject, 
+  onNewProject, 
+  onDeleteProject,
+  onRenameProject 
+}: ProjectsGridProps) => {
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [projectToRename, setProjectToRename] = useState<Project | null>(null);
+  const [newName, setNewName] = useState('');
+
   if (loading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6">
@@ -57,6 +79,23 @@ export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject, o
     }
   };
 
+  const openRenameDialog = (e: React.MouseEvent, project: Project) => {
+    e.stopPropagation();
+    setProjectToRename(project);
+    setNewName(project.name);
+    setRenameDialogOpen(true);
+  };
+
+  const handleRename = () => {
+    const trimmedName = newName.trim();
+    if (projectToRename && onRenameProject && trimmedName && trimmedName.length <= 100) {
+      onRenameProject(projectToRename.id, trimmedName);
+      setRenameDialogOpen(false);
+      setProjectToRename(null);
+      setNewName('');
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto px-6">
       <div className="flex items-center justify-between mb-4">
@@ -79,38 +118,53 @@ export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject, o
             className="overflow-hidden group hover:border-primary/50 bg-card/50 border-border/50 transition-all cursor-pointer hover:bg-card/80 relative"
             onClick={() => onOpenProject(project)}
           >
-            {/* Delete Button */}
-            {onDeleteProject && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive/80 hover:bg-destructive text-white rounded-lg"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="glass-strong border-border/50" onClick={(e) => e.stopPropagation()}>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete "{project.name}"?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete this project and all its versions. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-white/5 border-border/50 hover:bg-white/10">Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={(e) => handleDelete(e, project.id)} 
-                      className="bg-destructive hover:bg-destructive/90"
+            {/* Action Buttons */}
+            <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Rename Button */}
+              {onRenameProject && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 bg-white/10 hover:bg-white/20 text-white rounded-lg backdrop-blur-sm"
+                  onClick={(e) => openRenameDialog(e, project)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              
+              {/* Delete Button */}
+              {onDeleteProject && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 bg-destructive/80 hover:bg-destructive text-white rounded-lg"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="glass-strong border-border/50" onClick={(e) => e.stopPropagation()}>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete "{project.name}"?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete this project and all its versions. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-white/5 border-border/50 hover:bg-white/10">Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={(e) => handleDelete(e, project.id)} 
+                        className="bg-destructive hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
 
             {/* Preview thumbnail */}
             <div className="h-24 bg-muted/20 relative overflow-hidden">
@@ -139,6 +193,47 @@ export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject, o
           </Card>
         ))}
       </div>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent className="glass-strong border-border/50 sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+            <DialogDescription>
+              Enter a new name for your project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value.slice(0, 100))}
+              placeholder="Project name"
+              className="bg-white/5 border-white/10"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleRename();
+                }
+              }}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              {newName.length}/100 characters
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)} className="bg-white/5 border-border/50 hover:bg-white/10">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRename} 
+              disabled={!newName.trim() || newName.trim().length > 100}
+              className="gradient-animated text-white"
+            >
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
