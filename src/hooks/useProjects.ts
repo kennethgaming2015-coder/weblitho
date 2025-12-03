@@ -80,7 +80,7 @@ export const useProjects = () => {
           files,
           pages,
           chat_history: parseJsonArray<{ role: string; content: string }>(p.chat_history as Json, []),
-          selected_model: p.selected_model || 'weblitho-fast',
+          selected_model: p.selected_model || 'deepseek-free',
           created_at: p.created_at,
           updated_at: p.updated_at,
         };
@@ -118,7 +118,7 @@ export const useProjects = () => {
           preview: data.preview || null,
           files: (data.files || []) as unknown as Json,
           chat_history: (data.chat_history || []) as unknown as Json,
-          selected_model: data.selected_model || 'weblitho-fast',
+          selected_model: data.selected_model || 'deepseek-free',
         })
         .select()
         .single();
@@ -147,7 +147,7 @@ export const useProjects = () => {
         files: parseJsonArray<ProjectFile>(project.files as Json, []),
         pages: [{ id: 'home', name: 'Home', path: '/', icon: 'home' }],
         chat_history: parseJsonArray<{ role: string; content: string }>(project.chat_history as Json, []),
-        selected_model: project.selected_model || 'weblitho-fast',
+        selected_model: project.selected_model || 'deepseek-free',
         created_at: project.created_at,
         updated_at: project.updated_at,
       };

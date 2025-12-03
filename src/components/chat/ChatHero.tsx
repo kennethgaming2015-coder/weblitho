@@ -86,7 +86,7 @@ export const ChatHero = ({
     setInput(prev => prev + (prev ? '\n\n' : '') + `Use this image: ${url}`);
   };
 
-  const currentModel = modelConfig[selectedModel] || modelConfig["google/gemini-2.0-flash"];
+  const currentModel = modelConfig[selectedModel] || modelConfig["deepseek-free"];
 
   return (
     <div className="relative min-h-screen hero-mesh noise overflow-hidden">
