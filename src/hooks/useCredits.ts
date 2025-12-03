@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ModelType } from '@/components/builder/SettingsDialog';
 
-export type SubscriptionPlan = 'free' | 'pro' | 'business';
+export type SubscriptionPlan = 'free' | 'pro' | 'business' | 'owner';
 
 export interface UserCredits {
   id: string;
@@ -14,6 +14,7 @@ export interface UserCredits {
   daily_credits: number;
   last_daily_reset: string;
   last_monthly_reset: string;
+  is_unlimited?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,13 @@ export const PLAN_DETAILS = {
     monthlyCredits: 500,
     dailyCredits: 50,
     features: ['500 monthly credits', '50 daily credits', 'All AI models', 'Priority support', 'Team collaboration', 'Custom domains'],
+  },
+  owner: {
+    name: 'Owner',
+    price: 0,
+    monthlyCredits: 999999,
+    dailyCredits: 999999,
+    features: ['Unlimited credits', 'All AI models', 'Full platform access', 'Admin controls'],
   },
 };
 

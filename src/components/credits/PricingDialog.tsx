@@ -46,8 +46,10 @@ export function PricingDialog({ open, onOpenChange }: PricingDialogProps) {
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          {(Object.entries(PLAN_DETAILS) as [SubscriptionPlan, typeof PLAN_DETAILS.free][]).map(([key, plan]) => {
-            const Icon = planIcons[key];
+          {(Object.entries(PLAN_DETAILS) as [SubscriptionPlan, typeof PLAN_DETAILS.free][])
+            .filter(([key]) => key !== 'owner')
+            .map(([key, plan]) => {
+            const Icon = planIcons[key as keyof typeof planIcons];
             const isCurrentPlan = credits?.plan === key;
             const isPro = key === 'pro';
 

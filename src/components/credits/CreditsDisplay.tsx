@@ -36,8 +36,9 @@ export function CreditsDisplay({ className }: CreditsDisplayProps) {
 
   const planDetails = PLAN_DETAILS[credits.plan];
   const usagePercent = (credits.credits_balance / planDetails.monthlyCredits) * 100;
-  const isLow = credits.credits_balance <= 5;
-  const isEmpty = credits.credits_balance === 0;
+  const isUnlimited = credits.is_unlimited || credits.plan === 'owner';
+  const isLow = !isUnlimited && credits.credits_balance <= 5;
+  const isEmpty = !isUnlimited && credits.credits_balance === 0;
 
   return (
     <>
@@ -47,12 +48,13 @@ export function CreditsDisplay({ className }: CreditsDisplayProps) {
             variant="ghost"
             className={cn(
               "flex items-center gap-2 px-3 h-9",
+              isUnlimited ? "text-primary" :
               isEmpty ? "text-destructive" : isLow ? "text-yellow-600 dark:text-yellow-400" : "",
               className
             )}
           >
             <Coins className="h-4 w-4" />
-            <span className="font-medium">{credits.credits_balance}</span>
+            <span className="font-medium">{isUnlimited ? "∞" : credits.credits_balance.toFixed(1)}</span>
             <ChevronUp className="h-3 w-3 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -64,12 +66,14 @@ export function CreditsDisplay({ className }: CreditsDisplayProps) {
                 <p className="text-xs text-muted-foreground capitalize">{credits.plan} Plan</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold">{credits.credits_balance}</p>
-                <p className="text-xs text-muted-foreground">of {planDetails.monthlyCredits}</p>
+                <p className="text-2xl font-bold">{isUnlimited ? "∞" : credits.credits_balance.toFixed(1)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {isUnlimited ? "Unlimited" : `of ${planDetails.monthlyCredits}`}
+                </p>
               </div>
             </div>
 
-            <Progress value={usagePercent} className="h-2" />
+            {!isUnlimited && <Progress value={usagePercent} className="h-2" />}
 
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="p-2 rounded-lg bg-muted/50">
