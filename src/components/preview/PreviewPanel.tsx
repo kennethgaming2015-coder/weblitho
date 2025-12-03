@@ -36,8 +36,11 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const { toast } = useToast();
 
-  // Show loading screen when generating
-  if (isGenerating && (!code || code.length < 500)) {
+  // Check if code is complete (has closing html tag)
+  const isCodeComplete = code && code.includes("</html>");
+
+  // Show loading screen when generating and code is not yet complete
+  if (isGenerating && !isCodeComplete) {
     return <GenerationLoader status={generationStatus} isGenerating={isGenerating} />;
   }
 

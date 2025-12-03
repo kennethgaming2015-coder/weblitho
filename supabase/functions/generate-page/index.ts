@@ -11,9 +11,15 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [], model = "google/gemini-2.5-flash" } = await req.json();
+    const { prompt, conversationHistory = [], currentCode = null, model = "google/gemini-2.5-flash" } = await req.json();
+
+    // Build context for modifications
+    const modificationContext = currentCode 
+      ? `\n\n🔄 MODIFICATION MODE:\nYou are modifying an EXISTING website. The user wants to make changes to the current code.\n\nCURRENT CODE TO MODIFY:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nIMPORTANT: Apply the user's requested changes to the above code. Return the COMPLETE modified HTML document with all changes applied. Do NOT start from scratch - modify the existing code.\n\n`
+      : "";
 
     const systemPrompt = `🎨 WEBSITE BUILDER AI — MASTER SYSTEM PROMPT
+${modificationContext}
 
 You are Qubetics Website Builder AI, a senior-level product designer + frontend engineer.
 

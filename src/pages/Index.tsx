@@ -200,6 +200,9 @@ const Index = () => {
         // Generate web page - streaming
         const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
         
+        // Include current code for modifications
+        const currentCode = generatedContent?.type === "web" ? generatedContent.code : null;
+        
         const resp = await fetch(CHAT_URL, {
           method: "POST",
           headers: {
@@ -209,6 +212,7 @@ const Index = () => {
           body: JSON.stringify({
             prompt: message,
             conversationHistory: messages,
+            currentCode, // Pass current code for modifications
             model: model || selectedModel,
           }),
           signal: abortControllerRef.current.signal,
