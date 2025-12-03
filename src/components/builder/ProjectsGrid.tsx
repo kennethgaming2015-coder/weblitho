@@ -1,18 +1,30 @@
-import { FolderOpen, Clock, Plus } from 'lucide-react';
+import { FolderOpen, Clock, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Project } from '@/hooks/useProjects';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface ProjectsGridProps {
   projects: Project[];
   loading: boolean;
   onOpenProject: (project: Project) => void;
   onNewProject: () => void;
+  onDeleteProject?: (projectId: string) => void;
 }
 
-export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject }: ProjectsGridProps) => {
+export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject, onDeleteProject }: ProjectsGridProps) => {
   if (loading) {
     return (
       <div className="w-full max-w-5xl mx-auto px-6">
@@ -38,6 +50,13 @@ export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject }:
   // Show max 8 recent projects
   const recentProjects = projects.slice(0, 8);
 
+  const handleDelete = (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    if (onDeleteProject) {
+      onDeleteProject(projectId);
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto px-6">
       <div className="flex items-center justify-between mb-4">
@@ -57,9 +76,42 @@ export const ProjectsGrid = ({ projects, loading, onOpenProject, onNewProject }:
         {recentProjects.map((project) => (
           <Card
             key={project.id}
-            className="overflow-hidden group hover:border-primary/50 bg-card/50 border-border/50 transition-all cursor-pointer hover:bg-card/80"
+            className="overflow-hidden group hover:border-primary/50 bg-card/50 border-border/50 transition-all cursor-pointer hover:bg-card/80 relative"
             onClick={() => onOpenProject(project)}
           >
+            {/* Delete Button */}
+            {onDeleteProject && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive/80 hover:bg-destructive text-white rounded-lg"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="glass-strong border-border/50" onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete "{project.name}"?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete this project and all its versions. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="bg-white/5 border-border/50 hover:bg-white/10">Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={(e) => handleDelete(e, project.id)} 
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+
             {/* Preview thumbnail */}
             <div className="h-24 bg-muted/20 relative overflow-hidden">
               {project.preview ? (
