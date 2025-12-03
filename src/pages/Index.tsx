@@ -6,8 +6,9 @@ import { PreviewPanel } from "@/components/preview/PreviewPanel";
 import { ModelType } from "@/components/builder/SettingsDialog";
 import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
 import { FileTree } from "@/components/builder/FileTree";
+import { CodeViewer } from "@/components/preview/CodeViewer";
 import { ExportOptions } from "@/components/builder/ExportOptions";
-import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose } from "lucide-react";
+import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,6 +70,8 @@ const Index = () => {
   });
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showFileTree, setShowFileTree] = useState(true);
+  const [selectedFileView, setSelectedFileView] = useState<{ name: string; content: string } | null>(null);
+  const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -493,51 +496,106 @@ const Index = () => {
             )}
           </div>
 
-          {/* File Tree - Optional Side Panel */}
-          {showFileTree && generatedContent?.code && !isGenerating && (
-            <div className="w-[200px] border-r border-border/50 bg-card/20 animate-slide-in-right">
-              <FileTree code={generatedContent.code} />
+          {/* File Tree - Side Panel */}
+          {showFileTree && (generatedContent?.code || isGenerating) && (
+            <div className="w-[220px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
+              <FileTree 
+                code={generatedContent?.code || ""} 
+                onFileSelect={(name, content) => {
+                  setSelectedFileView({ name, content });
+                  setViewMode("code");
+                }}
+              />
             </div>
           )}
 
           {/* Preview Panel - Right Side */}
-          <div className="flex-1 overflow-hidden bg-card/20">
-            {/* File tree toggle */}
-            {generatedContent?.code && !isGenerating && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFileTree(!showFileTree)}
-                className="absolute top-16 left-[412px] z-10 h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-lg"
-              >
-                {showFileTree ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-              </Button>
+          <div className="flex-1 overflow-hidden bg-card/20 flex flex-col">
+            {/* Toolbar with View Toggle */}
+            {(generatedContent?.code || isGenerating) && (
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-card/50 backdrop-blur-xl shrink-0">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowFileTree(!showFileTree)}
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-white/10 rounded-lg"
+                  >
+                    {showFileTree ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                  </Button>
+                  <div className="h-4 w-px bg-border/50" />
+                </div>
+                
+                <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+                  <Button
+                    variant={viewMode === "preview" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("preview")}
+                    className={`h-7 px-3 gap-1.5 ${viewMode === "preview" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span className="text-xs">Preview</span>
+                  </Button>
+                  <Button
+                    variant={viewMode === "code" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("code")}
+                    className={`h-7 px-3 gap-1.5 ${viewMode === "code" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <Code2 className="h-3.5 w-3.5" />
+                    <span className="text-xs">Code</span>
+                  </Button>
+                </div>
+                
+                <div className="w-20" /> {/* Spacer for balance */}
+              </div>
             )}
             
-            {generatedContent || isGenerating ? (
-              <div className="h-full animate-fade-in">
-                <PreviewPanel
-                  code={generatedContent?.code || ""}
-                  type={generatedContent?.type || "web"}
-                  metadata={generatedContent?.metadata}
-                  isGenerating={isGenerating}
-                  generationStatus={generationStatus}
-                  validation={validation}
-                />
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center animate-fade-in">
-                <div className="text-center space-y-4">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20">
-                    <Sparkles className="h-8 w-8 text-primary/60" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-base font-medium text-foreground/60">Your creation will appear here</p>
-                    <p className="text-sm text-muted-foreground">Start by describing what you want to build</p>
+            {/* Main Content Area */}
+            <div className="flex-1 overflow-hidden">
+              {isGenerating ? (
+                <div className="h-full animate-fade-in">
+                  <PreviewPanel
+                    code={generatedContent?.code || ""}
+                    type="web"
+                    isGenerating={isGenerating}
+                    generationStatus={generationStatus}
+                    validation={null}
+                  />
+                </div>
+              ) : generatedContent ? (
+                <div className="h-full animate-fade-in">
+                  {viewMode === "preview" ? (
+                    <PreviewPanel
+                      code={generatedContent.code}
+                      type={generatedContent.type}
+                      metadata={generatedContent.metadata}
+                      isGenerating={false}
+                      generationStatus=""
+                      validation={validation}
+                    />
+                  ) : (
+                    <CodeViewer 
+                      fileName={selectedFileView?.name || "index.html"} 
+                      content={selectedFileView?.content || generatedContent.code}
+                      language={selectedFileView?.name?.split('.').pop() || "html"}
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center animate-fade-in">
+                  <div className="text-center space-y-4">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 glow-cyan">
+                      <Sparkles className="h-10 w-10 text-primary/60" />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-lg font-medium text-foreground/80">Your creation will appear here</p>
+                      <p className="text-sm text-muted-foreground max-w-xs">Generate a website using the chat panel on the left</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </main>
       )}
