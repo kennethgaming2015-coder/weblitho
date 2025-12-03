@@ -227,6 +227,17 @@ const Index = () => {
     }
   };
 
+  const handleRenameProject = async (projectId: string, newName: string) => {
+    const success = await updateProject(projectId, { name: newName }, false);
+    if (success) {
+      toast({ title: "Project renamed", description: `Project renamed to "${newName}"` });
+      // Update local state if viewing this project
+      if (searchParams.get("project") === projectId) {
+        setProjectName(newName);
+      }
+    }
+  };
+
   // Page management handlers
   const handleAddPage = (page: Omit<ProjectPage, 'id'>) => {
     const newPage: ProjectPage = {
@@ -673,6 +684,7 @@ const Index = () => {
               onOpenProject={(project: Project) => setSearchParams({ project: project.id })}
               onNewProject={handleNewProject}
               onDeleteProject={handleDeleteProject}
+              onRenameProject={handleRenameProject}
             />
           </div>
         </div>
