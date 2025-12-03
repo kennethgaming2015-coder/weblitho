@@ -11,11 +11,12 @@ import { ExportOptions } from "@/components/builder/ExportOptions";
 import { VersionHistory } from "@/components/builder/VersionHistory";
 import { TemplateGallery } from "@/components/builder/TemplateGallery";
 import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
+import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
 import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useProjects, ProjectFile } from "@/hooks/useProjects";
+import { useProjects, ProjectFile, Project } from "@/hooks/useProjects";
 import type { User } from "@supabase/supabase-js";
 import {
   AlertDialog,
@@ -79,7 +80,7 @@ const Index = () => {
   const { toast } = useToast();
   const abortControllerRef = useRef<AbortController | null>(null);
   
-  const { projects, createProject, updateProject, getProjectVersions, restoreVersion } = useProjects();
+  const { projects, loading: projectsLoading, createProject, updateProject, getProjectVersions, restoreVersion } = useProjects();
 
   // Check authentication
   useEffect(() => {
@@ -560,12 +561,24 @@ const Index = () => {
 
       {/* Main Content */}
       {!isGenerating && messages.length === 0 ? (
-        <ChatHero 
-          onSubmit={handleMessageSubmit}
-          isGenerating={isGenerating}
-          selectedModel={selectedModel}
-          onModelChange={handleModelChange}
-        />
+        <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
+          <ChatHero 
+            onSubmit={handleMessageSubmit}
+            isGenerating={isGenerating}
+            selectedModel={selectedModel}
+            onModelChange={handleModelChange}
+          />
+          
+          {/* Recent Projects Section */}
+          <div className="pb-12">
+            <ProjectsGrid
+              projects={projects}
+              loading={projectsLoading}
+              onOpenProject={(project: Project) => setSearchParams({ project: project.id })}
+              onNewProject={handleNewProject}
+            />
+          </div>
+        </div>
       ) : (
         <main className="fixed inset-0 pt-14 flex hero-mesh">
           {/* Chat Panel - Left Side */}
