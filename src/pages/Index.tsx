@@ -69,7 +69,7 @@ const Index = () => {
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<ModelType>("google/gemini-2.0-flash");
+  const [selectedModel, setSelectedModel] = useState<ModelType>("deepseek-free");
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
@@ -119,7 +119,7 @@ const Index = () => {
           content: msg.content,
         }));
         setMessages(typedHistory);
-        setSelectedModel((project.selected_model as ModelType) || "google/gemini-2.0-flash");
+        setSelectedModel((project.selected_model as ModelType) || "deepseek-free");
         
         // Load pages from project
         if (project.pages && project.pages.length > 0) {
