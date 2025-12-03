@@ -55,28 +55,49 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          billing_address: string | null
+          billing_city: string | null
+          billing_country: string | null
+          billing_email: string | null
+          billing_name: string | null
+          billing_postal_code: string | null
           created_at: string
           email: string
           full_name: string | null
           id: string
+          stripe_customer_id: string | null
           updated_at: string
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
+          billing_address?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_email?: string | null
+          billing_name?: string | null
+          billing_postal_code?: string | null
           created_at?: string
           email: string
           full_name?: string | null
           id: string
+          stripe_customer_id?: string | null
           updated_at?: string
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
+          billing_address?: string | null
+          billing_city?: string | null
+          billing_country?: string | null
+          billing_email?: string | null
+          billing_name?: string | null
+          billing_postal_code?: string | null
           created_at?: string
           email?: string
           full_name?: string | null
           id?: string
+          stripe_customer_id?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -216,6 +237,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      reset_daily_credits: { Args: never; Returns: undefined }
     }
     Enums: {
       subscription_plan: "free" | "pro" | "business"
