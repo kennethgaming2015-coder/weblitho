@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Plus, FolderOpen, Trash2, Clock, MoreVertical, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Footer } from '@/components/layout/Footer';
 import { formatDistanceToNow } from 'date-fns';
+import weblithoLogo from "@/assets/weblitho-logo.png";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -89,12 +90,9 @@ const Dashboard = () => {
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">W</span>
-            </div>
-            <span className="font-semibold text-lg">Weblitho</span>
-          </div>
+          <Link to="/" className="flex items-center hover:opacity-80 transition-opacity">
+            <img src={weblithoLogo} alt="Weblitho" className="h-8 w-auto" />
+          </Link>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={handleLogout}>

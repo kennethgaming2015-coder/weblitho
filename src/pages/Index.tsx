@@ -16,7 +16,8 @@ import { PagesPanel } from "@/components/builder/PagesPanel";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
 import { Footer } from "@/components/layout/Footer";
 import { useCredits } from "@/hooks/useCredits";
-import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
+import { Moon, Sun, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
+import weblithoLogo from "@/assets/weblitho-logo.png";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -556,11 +557,8 @@ const Index = () => {
       <header className="fixed top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-6">
-            <Link to="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-              <div className="h-8 w-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg glow-cyan">
-                <Sparkles className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-bold text-lg text-foreground">Weblitho</span>
+            <Link to="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
+              <img src={weblithoLogo} alt="Weblitho" className="h-8 w-auto" />
             </Link>
             
             {/* Project name indicator - editable */}
@@ -867,8 +865,8 @@ const Index = () => {
               ) : (
                 <div className="h-full flex items-center justify-center animate-fade-in">
                   <div className="text-center space-y-4">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 glow-cyan">
-                      <Sparkles className="h-10 w-10 text-primary/60" />
+                    <div className="inline-flex items-center justify-center">
+                      <img src={weblithoLogo} alt="Weblitho" className="h-16 w-auto opacity-60" />
                     </div>
                     <div className="space-y-2">
                       <p className="text-lg font-medium text-foreground/80">Your creation will appear here</p>

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, ArrowRight, Mail, Lock, User } from "lucide-react";
+import { Loader2, ArrowRight, Mail, Lock, User } from "lucide-react";
+import weblithoLogo from "@/assets/weblitho-logo.png";
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function Auth() {
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-float" />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-float delay-200" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
       </div>
 
       {/* Grid Pattern Overlay */}
@@ -77,17 +78,12 @@ export default function Auth() {
         <div className="w-full max-w-md space-y-8 animate-scale-in">
           {/* Logo & Title */}
           <div className="text-center space-y-4">
-            <div className="inline-flex items-center justify-center">
-              <div className="h-14 w-14 rounded-2xl gradient-animated flex items-center justify-center shadow-2xl glow-cyan">
-                <Sparkles className="h-7 w-7 text-white" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Weblitho</h1>
-              <p className="text-muted-foreground mt-2">
-                AI-powered website builder
-              </p>
-            </div>
+            <Link to="/" className="inline-flex items-center justify-center">
+              <img src={weblithoLogo} alt="Weblitho" className="h-12 w-auto" />
+            </Link>
+            <p className="text-muted-foreground">
+              AI-powered website builder
+            </p>
           </div>
 
           {/* Auth Card */}
@@ -190,7 +186,8 @@ export default function Auth() {
 
           {/* Footer */}
           <p className="text-center text-sm text-muted-foreground">
-            By continuing, you agree to our Terms of Service
+            By continuing, you agree to our{" "}
+            <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
           </p>
         </div>
       </div>
