@@ -39,8 +39,8 @@ const modelConfig: Record<ModelType, { name: string; description: string; badge?
   "google/gemini-2.0-flash": {
     name: "Weblitho 2.0",
     description: "🚀 Balanced speed and quality",
-    badge: "RECOMMENDED",
-    badgeColor: "bg-primary/10 text-primary"
+    badge: null,
+    badgeColor: ""
   },
   "google/gemini-2.0-pro": {
     name: "Weblitho 2.0 Premium",
