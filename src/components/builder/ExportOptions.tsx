@@ -20,12 +20,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
+interface ProjectFile {
+  path: string;
+  content: string;
+}
+
 interface ExportOptionsProps {
   code: string;
+  files?: ProjectFile[];
   projectName?: string;
 }
 
-export const ExportOptions = ({ code, projectName = "qubeai-project" }: ExportOptionsProps) => {
+export const ExportOptions = ({ code, files, projectName = "weblitho-project" }: ExportOptionsProps) => {
   const [isExporting, setIsExporting] = useState(false);
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [repoName, setRepoName] = useState(projectName);

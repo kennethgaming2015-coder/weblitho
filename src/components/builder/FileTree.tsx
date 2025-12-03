@@ -12,8 +12,14 @@ interface ExtractedFile {
   lines?: number;
 }
 
+interface ProjectFile {
+  path: string;
+  content: string;
+}
+
 interface FileTreeProps {
   code: string;
+  files?: ProjectFile[];
   onFileSelect?: (fileName: string, content: string) => void;
 }
 
@@ -223,10 +229,40 @@ interface TreeNodeProps {
   onSelect: (name: string, content: string) => void;
 }
 
-const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
-  const [isOpen, setIsOpen] = useState(depth < 2);
+// Convert ProjectFile[] to tree structure
+const convertProjectFilesToTree = (files: ProjectFile[]): ExtractedFile[] => {
+  const root: ExtractedFile[] = [];
+  
+  files.forEach(file => {
+    const parts = file.path.split('/');
+    let current = root;
+    
+    parts.forEach((part, index) => {
+      if (index === parts.length - 1) {
+        // It's a file
+        current.push({
+          name: part,
+          type: "file",
+          language: part.split('.').pop() || "",
+          content: file.content,
+          lines: file.content.split('\n').length
+        });
+      } else {
+        // It's a folder
+        let folder = current.find(f => f.name === part && f.type === "folder");
+        if (!folder) {
+          folder = { name: part, type: "folder", language: "", children: [] };
+          current.push(folder);
+        }
+        current = folder.children || [];
+      }
+    });
+  });
+  
+  return root;
+};
 
-  const handleClick = () => {
+
     if (node.type === "folder") {
       setIsOpen(!isOpen);
     } else if (node.content) {
@@ -297,10 +333,24 @@ const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
   );
 };
 
-export const FileTree = ({ code, onFileSelect }: FileTreeProps) => {
+export const FileTree = ({ code, files, onFileSelect }: FileTreeProps) => {
   const [selectedFile, setSelectedFile] = useState<string | null>("App.tsx");
   
-  const fileTree = useMemo(() => extractCodeStructure(code), [code]);
+  // Use provided files or extract from code
+  const fileTree = useMemo(() => {
+    if (files && files.length > 0) {
+      // Convert ProjectFile[] to ExtractedFile[] structure
+      return convertProjectFilesToTree(files);
+    }
+    return extractCodeStructure(code);
+  }, [code, files]);
+
+  const handleFileSelect = (name: string, content: string) => {
+    setSelectedFile(name);
+    onFileSelect?.(name, content);
+  };
+
+  return (
 
   const handleFileSelect = (name: string, content: string) => {
     setSelectedFile(name);
