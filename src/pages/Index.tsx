@@ -9,6 +9,8 @@ import { FileTree } from "@/components/builder/FileTree";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { ExportOptions } from "@/components/builder/ExportOptions";
 import { VersionHistory } from "@/components/builder/VersionHistory";
+import { TemplateGallery } from "@/components/builder/TemplateGallery";
+import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { Moon, Sun, Sparkles, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -492,6 +494,13 @@ const Index = () => {
                 </Button>
                 
                 <ExportOptions code={generatedContent?.preview || ""} files={generatedContent?.files} />
+                
+                <TemplateGallery onSelectTemplate={(prompt) => handleMessageSubmit(prompt)} />
+                
+                <ImageUploadPanel onInsertImage={(url) => {
+                  // Insert image URL into the chat as context
+                  handleMessageSubmit(`Use this image in my design: ${url}`);
+                }} />
                 
                 <VersionHistory 
                   projectId={projectId}
