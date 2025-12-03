@@ -85,7 +85,7 @@ export default function Auth() {
             <div>
               <h1 className="text-3xl font-bold text-white">Weblitho</h1>
               <p className="text-muted-foreground mt-2">
-                AI-powered website & contract builder
+                AI-powered website builder
               </p>
             </div>
           </div>
