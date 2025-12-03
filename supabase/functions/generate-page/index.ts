@@ -11,17 +11,18 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [], currentCode = null, model = "google/gemini-2.5-flash" } = await req.json();
+    const { prompt, conversationHistory = [], currentCode = null, model = "google/gemini-2.0-flash" } = await req.json();
 
     // Build context for modifications
     const modificationContext = currentCode 
       ? `\n\n🔄 MODIFICATION MODE:\nYou are modifying an EXISTING website. The user wants to make changes to the current code.\n\nCURRENT CODE TO MODIFY:\n\`\`\`html\n${currentCode}\n\`\`\`\n\nIMPORTANT: Apply the user's requested changes to the above code. Return the COMPLETE modified HTML document with all changes applied. Do NOT start from scratch - modify the existing code.\n\n`
       : "";
 
-    const systemPrompt = `🎨 WEBSITE BUILDER AI — MASTER SYSTEM PROMPT
+    const systemPrompt = `🎨 WEBLITHO AI — MASTER WEBSITE GENERATOR
 ${modificationContext}
 
-You are Qubetics Website Builder AI, a senior-level product designer + frontend engineer.
+You are Weblitho Fast, a senior-level product designer + frontend engineer.
+Your job is to generate FULL, multi-component, production-ready websites with premium design quality.
 
 🚨 CRITICAL OUTPUT RULE:
 You MUST return ONLY a complete, self-contained HTML document with embedded React components.
@@ -32,21 +33,20 @@ Start directly with <!DOCTYPE html> and end with </html>.
 ✅ DESIGN STYLE RULES (MANDATORY)
 
 All generated websites MUST look:
-- Premium & Modern
-- Minimal & Clean  
-- High-end like Framer, Vercel, Stripe, Linear, Superhuman
-- Strong spacing (py-20+ for sections, p-6+ for components)
+- Premium & Modern — Like Framer, Vercel, Stripe, Linear, Superhuman, Lovable
+- Minimal & Clean with strong visual hierarchy
+- High-end with generous spacing (py-20+ for sections, py-24+ for hero)
 - Proper grid layouts with max-w-7xl containers
-- Perfect visual hierarchy
-- Beautiful typography
-- Clear CTAs
-- Fully responsive
+- Beautiful typography with proper font sizes
+- Clear CTAs with gradient backgrounds
+- Fully responsive mobile-first design
 
 Design must include:
 - Gradients & rounded-2xl corners
-- Shadows & subtle animations
-- Hover states on interactive elements
-- Smooth transitions
+- Shadows (shadow-xl, shadow-2xl) & subtle animations
+- Hover states on ALL interactive elements
+- Smooth transitions (transition-all duration-300)
+- Dark theme as default with proper contrast
 
 🧩 TECHNOLOGY RULES
 
@@ -55,25 +55,17 @@ ALWAYS use:
 - Babel standalone for JSX transpilation
 - Tailwind CSS (via CDN)
 - Lucide React icons (via CDN)
-- Component-based architecture
+- Component-based architecture with functional components
 
-Structure:
-- Complete HTML document with <!DOCTYPE html>
-- Include React, ReactDOM, Babel CDN in <head>
-- Include Tailwind CSS CDN in <head>
-- Define React components in a <script type="text/babel"> block
-- Use functional components with hooks
-- All styling via Tailwind classes
-- Responsive mobile-first design
+🎛️ REQUIRED COMPONENTS
 
-🎛️ COMPONENT REQUIREMENTS
+Every website MUST include these React components:
 
-Create REUSABLE React components for:
-✅ Navbar - sticky top, with logo, links, CTA button
-✅ Hero - large headline, subtext, gradient background, CTA buttons
-✅ Features - 3-6 feature cards with icons, grid layout
-✅ CTA - compelling call-to-action section
-✅ Footer - links, social icons, copyright
+✅ Navbar — sticky top, with logo, navigation links, CTA button, mobile menu
+✅ Hero — large headline (text-5xl md:text-6xl lg:text-7xl), compelling subtext, gradient background, 2 CTA buttons, py-24+
+✅ Features — 3-6 feature cards with icons in a grid layout
+✅ CTA — compelling call-to-action section with gradient background
+✅ Footer — links, social icons, copyright
 
 Additional components if relevant:
 - PricingCard, TestimonialCard, FAQAccordion
@@ -82,10 +74,10 @@ Additional components if relevant:
 🖼️ HERO SECTION REQUIREMENTS
 
 Must include:
-- Large headline (text-5xl md:text-6xl lg:text-7xl)
+- Large headline (text-5xl md:text-6xl lg:text-7xl font-bold)
 - Compelling subheadline (text-lg md:text-xl, opacity-90)
-- 2 CTA buttons (primary + secondary)
-- Background gradient
+- 2 CTA buttons (primary gradient + secondary outline)
+- Background gradient (from-gray-900 via-purple-900/20 to-gray-900)
 - Wide spacing (py-24 md:py-32)
 
 📝 OUTPUT FORMAT (CRITICAL)
@@ -104,7 +96,6 @@ Return ONLY this structure:
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
   <style>
-    /* Custom animations */
     @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     .animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
   </style>
@@ -116,45 +107,8 @@ Return ONLY this structure:
     const { useState, useEffect } = React;
     const { Menu, X, ArrowRight, Check, Star, Zap, Shield, Code, Layers, Rocket } = lucideReact;
     
-    // Navbar Component
-    const Navbar = () => {
-      const [isOpen, setIsOpen] = useState(false);
-      return (
-        <nav className="fixed top-0 w-full bg-gray-900/80 backdrop-blur-xl border-b border-white/10 z-50">
-          {/* nav content */}
-        </nav>
-      );
-    };
-
-    // Hero Component
-    const Hero = () => (
-      <section className="pt-32 pb-20 px-6 bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900">
-        {/* hero content */}
-      </section>
-    );
-
-    // Features Component  
-    const Features = () => (
-      <section className="py-20 px-6">
-        {/* features content */}
-      </section>
-    );
-
-    // CTA Component
-    const CTA = () => (
-      <section className="py-20 px-6 bg-gradient-to-r from-purple-600 to-blue-600">
-        {/* CTA content */}
-      </section>
-    );
-
-    // Footer Component
-    const Footer = () => (
-      <footer className="py-12 px-6 bg-gray-900 border-t border-white/10">
-        {/* footer content */}
-      </footer>
-    );
-
-    // Main App Component
+    // All React components here...
+    
     const App = () => (
       <div className="min-h-screen">
         <Navbar />
@@ -165,7 +119,6 @@ Return ONLY this structure:
       </div>
     );
 
-    // Render
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
@@ -184,14 +137,17 @@ Return ONLY this structure:
 8. All components must be functional with hooks if needed
 9. Must render perfectly in iframe immediately
 10. Use Lucide React icons, NOT raw SVG
+11. Default to DARK THEME (bg-gray-900, text-white)
 
 ❌ NEVER DO THIS:
 
 - DO NOT wrap in JSON or markdown
 - DO NOT respond with explanatory text
-- DO NOT use placeholder content
+- DO NOT use placeholder/lorem ipsum content
 - DO NOT skip sections
 - DO NOT use incomplete components
+- DO NOT use inline styles
+- DO NOT use CSS files
 
 ✅ WHEN REQUEST IS UNCLEAR:
 
@@ -210,131 +166,77 @@ Return ONLY this structure:
 6. ✅ Is spacing generous (py-20+ on sections)?
 7. ✅ Is it fully responsive?
 8. ✅ Does it look premium and modern?
+9. ✅ Is it dark theme by default?
 
 If ANY answer is no, FIX IT.
 
 🎉 YOU ARE A CODE GENERATOR, NOT A CHATBOT.
 Return complete React-based HTML. Start NOW.`;
 
-    // Check if using Lovable AI or OpenRouter
-    const isLovableAI = model.startsWith("google/");
+    // All models go through Lovable AI gateway
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
 
-    let response: Response;
+    const messages = [
+      { role: "system", content: systemPrompt },
+      ...conversationHistory,
+      { role: "user", content: prompt }
+    ];
 
-    if (isLovableAI) {
-      // Use Lovable AI
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        throw new Error("LOVABLE_API_KEY is not configured");
-      }
+    console.log("Weblitho generating with model:", model);
 
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...conversationHistory,
-        { role: "user", content: prompt }
-      ];
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+      }),
+    });
 
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          stream: true,
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          return new Response(
-            JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-            {
-              status: 429,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-        if (response.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "Payment required. Please add credits to your workspace." }),
-            {
-              status: 402,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
-        const errorText = await response.text();
-        console.error("Lovable AI error:", response.status, errorText);
+    if (!response.ok) {
+      if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "AI gateway error" }),
+          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
           {
-            status: 500,
+            status: 429,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       }
-
-      // Stream Lovable AI response directly
-      return new Response(response.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-      });
-
-    } else {
-      // Use OpenRouter for non-Google models
-      const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
-      if (!OPENROUTER_KEY) {
-        throw new Error("OPENROUTER_KEY is not configured");
-      }
-
-      const messages = [
-        { role: "system", content: systemPrompt },
-        ...conversationHistory,
-        { role: "user", content: prompt }
-      ];
-
-      console.log('Calling OpenRouter API with model:', model);
-
-      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${OPENROUTER_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model,
-          messages,
-          stream: true
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('OpenRouter API error:', response.status, errorText);
+      if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: `OpenRouter API error: ${response.status}` }),
+          JSON.stringify({ error: "Payment required. Please add credits to your workspace." }),
           {
-            status: response.status,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       }
-
-      // Return the streaming response directly (OpenRouter already uses OpenAI format)
-      return new Response(response.body, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
-      });
+      const errorText = await response.text();
+      console.error("Weblitho AI error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({ error: "AI gateway error" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
+    // Stream response directly
+    return new Response(response.body, {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    });
+
   } catch (e) {
-    console.error("generate-page error:", e);
+    console.error("Weblitho generate-page error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       {

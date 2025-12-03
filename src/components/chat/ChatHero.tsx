@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Send, Paperclip, Settings2, Sparkles, FileText, X, Wand2, Image as ImageIcon, Code, Palette, Zap, ShoppingCart, Layout, FileCode } from "lucide-react";
+import { Send, Paperclip, Settings2, Sparkles, FileText, X, Wand2, Image as ImageIcon, Code, Palette, Zap, ShoppingCart, Layout, FileCode, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ModelType } from "@/components/builder/SettingsDialog";
+import { ModelType, modelConfig } from "@/components/builder/SettingsDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatHeroProps {
@@ -129,6 +129,9 @@ export const ChatHero = ({
     });
   };
 
+  // Get current model display info
+  const currentModelInfo = modelConfig[selectedModel] || modelConfig["google/gemini-2.0-flash"];
+
   return (
     <div className="relative min-h-screen hero-gradient flex items-center justify-center px-4 py-20">
       <div className="w-full max-w-6xl mx-auto space-y-8">
@@ -136,7 +139,7 @@ export const ChatHero = ({
         <div className="flex justify-center animate-fade-in">
           <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 px-4 py-1.5">
             <Sparkles className="h-3 w-3 mr-2" />
-            AI-Powered Builder
+            Weblitho AI Website Builder
           </Badge>
         </div>
 
@@ -145,12 +148,16 @@ export const ChatHero = ({
           <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight">
             Build something with{" "}
             <span className="bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 bg-clip-text text-transparent">
-              QubeAI
+              Weblitho
             </span>
           </h1>
           <p className="text-xl md:text-2xl text-white/70">
-            Create apps, websites, and smart contracts by chatting with AI
+            Create premium websites and smart contracts by chatting with AI
           </p>
+          <div className="flex items-center justify-center gap-2 text-sm text-green-500/80">
+            <Shield className="h-4 w-4" />
+            <span>All code automatically validated before delivery</span>
+          </div>
         </div>
 
         {/* Quick Templates */}
@@ -183,15 +190,21 @@ export const ChatHero = ({
                 <span className="text-xs text-white/60">Model:</span>
                 <Select value={selectedModel} onValueChange={(value) => onModelChange(value as ModelType)}>
                   <SelectTrigger className="h-8 w-[220px] bg-white/5 border-white/10 text-sm">
-                    <SelectValue />
+                    <SelectValue>{currentModelInfo.name}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="google/gemini-2.5-flash">QubeAI 2.5 Flash</SelectItem>
-                    <SelectItem value="google/gemini-2.5-pro">QubeAI 2.5 Pro</SelectItem>
-                    <SelectItem value="google/gemini-2.5-flash-lite">QubeAI 2.5 Flash Lite</SelectItem>
-                    <SelectItem value="x-ai/grok-4.1-fast:free">Grok 4.1 Fast</SelectItem>
-                    <SelectItem value="deepseek/deepseek-r1:free">DeepSeek R1</SelectItem>
-                    <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B</SelectItem>
+                    {(Object.entries(modelConfig) as [ModelType, typeof modelConfig[ModelType]][]).map(([modelId, config]) => (
+                      <SelectItem key={modelId} value={modelId}>
+                        <div className="flex items-center gap-2">
+                          <span>{config.name}</span>
+                          {config.badge && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${config.badgeColor}`}>
+                              {config.badge}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

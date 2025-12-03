@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.validate-code]
 verify_jwt = false
+
+[functions.weblitho-validate]
+verify_jwt = false
