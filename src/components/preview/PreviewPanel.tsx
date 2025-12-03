@@ -36,12 +36,37 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const { toast } = useToast();
 
+  // Clean code - extract HTML content, strip any reasoning/thinking tokens
+  const cleanCode = (() => {
+    if (!code) return "";
+    // Find the start of HTML document
+    const htmlStart = code.indexOf("<!DOCTYPE html>");
+    const htmlAltStart = code.indexOf("<html");
+    const startIndex = htmlStart !== -1 ? htmlStart : htmlAltStart;
+    if (startIndex === -1) return code;
+    return code.slice(startIndex);
+  })();
+
   // Check if code is complete (has closing html tag)
-  const isCodeComplete = code && code.includes("</html>");
+  const isCodeComplete = cleanCode && cleanCode.includes("</html>");
 
   // Show loading screen when generating and code is not yet complete
   if (isGenerating && !isCodeComplete) {
     return <GenerationLoader status={generationStatus} isGenerating={isGenerating} />;
+  }
+
+  // If not generating and no valid code, show placeholder
+  if (!isGenerating && !cleanCode) {
+    return (
+      <div className="h-full flex items-center justify-center bg-[#0d0d0d]">
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500/10 to-purple-600/10 border border-white/5">
+            <Eye className="h-8 w-8 text-white/40" />
+          </div>
+          <p className="text-sm text-white/40">No preview available</p>
+        </div>
+      </div>
+    );
   }
 
   const handleCopy = () => {
@@ -176,7 +201,7 @@ export const PreviewPanel = ({ code, type, metadata, isGenerating = false, gener
                 }}
               >
                 <iframe
-                  srcDoc={code}
+                  srcDoc={cleanCode}
                   title="Preview"
                   className="w-full h-full border-none"
                   sandbox="allow-scripts allow-same-origin"
