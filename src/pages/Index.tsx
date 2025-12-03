@@ -56,7 +56,7 @@ const Index = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ModelType>(
-    (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.5-flash"
+    (localStorage.getItem("ai_model") as ModelType) || "google/gemini-2.0-flash"
   );
   const [theme, setTheme] = useState<"light" | "dark">("dark");
   const [generatedContent, setGeneratedContent] = useState<{
@@ -298,11 +298,11 @@ const Index = () => {
           content: "Generated beautiful website successfully ✨" 
         }]);
 
-        setGenerationStatus("Validating code quality...");
+        setGenerationStatus("Weblitho Validator checking code...");
         
-        // Run validation with KatCoder Pro
+        // Run validation with Weblitho Validator
         try {
-          const validationResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/validate-code`, {
+          const validationResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/weblitho-validate`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -315,20 +315,25 @@ const Index = () => {
             const validationResult = await validationResp.json();
             setValidation(validationResult);
             
-            if (validationResult.score >= 80) {
+            if (validationResult.score >= 90) {
+              toast({
+                title: "✅ Excellent Code Quality",
+                description: `Weblitho Validator: ${validationResult.score}/100`,
+              });
+            } else if (validationResult.score >= 80) {
               toast({
                 title: "✅ High Quality Code",
-                description: `Validation score: ${validationResult.score}/100`,
+                description: `Weblitho Validator: ${validationResult.score}/100`,
               });
             } else if (validationResult.score >= 60) {
               toast({
                 title: "⚠️ Good Code with Suggestions",
-                description: `Validation score: ${validationResult.score}/100`,
+                description: `Weblitho Validator: ${validationResult.score}/100`,
               });
             }
           }
         } catch (validationError) {
-          console.log("Validation skipped:", validationError);
+          console.log("Weblitho Validator skipped:", validationError);
         }
 
         setGenerationStatus("Generation complete!");
@@ -458,9 +463,12 @@ const Index = () => {
           <div className="w-[420px] border-r border-white/10 bg-[#0a0a0a]/50 backdrop-blur-xl flex flex-col animate-slide-in-right">
             {/* Chat Header */}
             <div className="px-4 py-3 border-b border-white/5 bg-gradient-to-r from-orange-500/10 to-purple-600/10">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-pulse" />
-                <span className="text-sm font-medium text-white">AI Assistant</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-gradient-to-r from-orange-500 to-purple-600 animate-pulse" />
+                  <span className="text-sm font-medium text-white">Weblitho AI</span>
+                </div>
+                <span className="text-[10px] text-green-500/80 bg-green-500/10 px-2 py-0.5 rounded-full">Validator Active</span>
               </div>
             </div>
 

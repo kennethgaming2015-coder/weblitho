@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Zap } from "lucide-react";
+import { Settings, Zap, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,13 +20,47 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
+// Model type mapping - internal API models
 export type ModelType = 
-  | "google/gemini-2.5-flash" 
-  | "google/gemini-2.5-pro" 
-  | "google/gemini-2.5-flash-lite"
-  | "x-ai/grok-4.1-fast:free"
-  | "deepseek/deepseek-r1:free"
-  | "meta-llama/llama-3.3-70b-instruct:free";
+  | "google/gemini-flash-1.5"      // Weblitho Fast (FREE)
+  | "google/gemini-2.0-flash"      // Weblitho 2.0
+  | "google/gemini-2.0-pro"        // Weblitho 2.0 Premium
+  | "google/gemini-2.5-pro"        // Weblitho 2.5 Ultra
+  | "google/gemini-2.5-flash";     // Weblitho 2.5 Fast
+
+// Model display configuration
+const modelConfig: Record<ModelType, { name: string; description: string; badge?: string; badgeColor?: string }> = {
+  "google/gemini-flash-1.5": {
+    name: "Weblitho Fast",
+    description: "⚡ Free fast generation for quick projects",
+    badge: "FREE",
+    badgeColor: "bg-green-500/10 text-green-500"
+  },
+  "google/gemini-2.0-flash": {
+    name: "Weblitho 2.0",
+    description: "🚀 Balanced speed and quality",
+    badge: "RECOMMENDED",
+    badgeColor: "bg-primary/10 text-primary"
+  },
+  "google/gemini-2.0-pro": {
+    name: "Weblitho 2.0 Premium",
+    description: "💎 Higher quality for complex projects",
+    badge: "PREMIUM",
+    badgeColor: "bg-amber-500/10 text-amber-500"
+  },
+  "google/gemini-2.5-pro": {
+    name: "Weblitho 2.5 Ultra",
+    description: "🏆 Best quality for premium websites",
+    badge: "ULTRA",
+    badgeColor: "bg-purple-500/10 text-purple-500"
+  },
+  "google/gemini-2.5-flash": {
+    name: "Weblitho 2.5 Fast",
+    description: "⚡ Latest model with fast generation",
+    badge: "NEW",
+    badgeColor: "bg-blue-500/10 text-blue-500"
+  }
+};
 
 interface SettingsDialogProps {
   onSettingsChange: (model: ModelType) => void;
@@ -34,33 +68,25 @@ interface SettingsDialogProps {
 
 export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<ModelType>("google/gemini-2.5-flash");
+  const [model, setModel] = useState<ModelType>("google/gemini-2.0-flash");
   const { toast } = useToast();
 
   useEffect(() => {
     const savedModel = localStorage.getItem("ai_model") as ModelType;
-    if (savedModel) setModel(savedModel);
+    if (savedModel && modelConfig[savedModel]) {
+      setModel(savedModel);
+    }
   }, []);
 
   const handleSave = () => {
     localStorage.setItem("ai_model", model);
     onSettingsChange(model);
 
-    const modelDisplayName = model.includes("2.5-pro") 
-      ? "QubeAI 2.5 Pro" 
-      : model.includes("2.5-flash-lite")
-      ? "QubeAI 2.5 Flash Lite"
-      : model.includes("grok")
-      ? "Grok 4.1 Fast"
-      : model.includes("deepseek")
-      ? "DeepSeek R1"
-      : model.includes("llama")
-      ? "Llama 3.3 70B"
-      : "QubeAI 2.5 Flash";
+    const config = modelConfig[model];
     
     toast({
       title: "Model Updated",
-      description: `Now using ${modelDisplayName}`,
+      description: `Now using ${config.name}`,
     });
 
     setOpen(false);
@@ -77,23 +103,34 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
       <DialogContent className="sm:max-w-[540px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            AI Model Selection
+            <Sparkles className="h-5 w-5 text-primary" />
+            Weblitho AI Model
           </DialogTitle>
           <DialogDescription>
-            Choose the AI model that powers your page generation
+            Select the AI model for website generation. All models include automatic code validation.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* Validator Info */}
+          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Shield className="h-4 w-4 text-green-500" />
+              <span className="font-medium text-green-500">Weblitho Validator Active</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              All generated code is automatically validated and fixed before delivery
+            </p>
+          </div>
+
           <div className="space-y-4">
             <div className="rounded-lg border border-primary/20 bg-gradient-accent p-4">
               <Label className="text-base font-semibold mb-3 flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                QubeAI Models
+                Generation Model
               </Label>
               <p className="text-xs text-muted-foreground mb-3">
-                Choose the AI model that powers your generation
+                Choose the AI model that powers your website generation
               </p>
               <Select 
                 value={model}
@@ -103,69 +140,23 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="google/gemini-2.5-flash">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">QubeAI 2.5 Flash</span>
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">RECOMMENDED</span>
+                  {(Object.entries(modelConfig) as [ModelType, typeof modelConfig[ModelType]][]).map(([modelId, config]) => (
+                    <SelectItem key={modelId} value={modelId}>
+                      <div className="flex flex-col items-start gap-1 py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{config.name}</span>
+                          {config.badge && (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${config.badgeColor}`}>
+                              {config.badge}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {config.description}
+                        </span>
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        ⚡ Balanced speed and quality for most projects
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="google/gemini-2.5-pro">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">QubeAI 2.5 Pro</span>
-                        <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full font-medium">PREMIUM</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        🚀 Most capable for complex reasoning and projects
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="google/gemini-2.5-flash-lite">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <span className="font-semibold">QubeAI 2.5 Flash Lite</span>
-                      <span className="text-xs text-muted-foreground">
-                        💨 Fastest generation for simple projects
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="x-ai/grok-4.1-fast:free">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Grok 4.1 Fast</span>
-                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        🤖 Fast OpenRouter model by X.AI
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="deepseek/deepseek-r1:free">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">DeepSeek R1</span>
-                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        🧠 Advanced reasoning model via OpenRouter
-                      </span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="meta-llama/llama-3.3-70b-instruct:free">
-                    <div className="flex flex-col items-start gap-1 py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">Llama 3.3 70B</span>
-                        <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full font-medium">FREE</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        🦙 Meta's powerful open-source model
-                      </span>
-                    </div>
-                  </SelectItem>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -184,3 +175,6 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
     </Dialog>
   );
 };
+
+// Export model config for use in other components
+export { modelConfig };
