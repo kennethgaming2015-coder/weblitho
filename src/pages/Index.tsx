@@ -74,7 +74,7 @@ const Index = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ModelType>("deepseek-free");
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [showFileTree, setShowFileTree] = useState(true);

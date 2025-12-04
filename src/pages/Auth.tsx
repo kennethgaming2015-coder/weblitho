@@ -66,13 +66,12 @@ export default function Auth() {
     <div className="min-h-screen hero-mesh noise relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-float delay-200" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-primary/5 rounded-full blur-3xl animate-float delay-200" />
       </div>
 
       {/* Grid Pattern Overlay */}
-      <div className="absolute inset-0 grid-pattern opacity-30" />
+      <div className="absolute inset-0 grid-pattern opacity-40" />
 
       <div className="relative min-h-screen flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-8 animate-scale-in">
@@ -87,15 +86,15 @@ export default function Auth() {
           </div>
 
           {/* Auth Card */}
-          <div className="glass-strong rounded-3xl p-8 shadow-2xl">
+          <div className="bg-card border border-border rounded-3xl p-8 shadow-xl">
             {/* Mode Toggle */}
-            <div className="flex rounded-xl bg-white/5 p-1 mb-8">
+            <div className="flex rounded-xl bg-muted p-1 mb-8">
               <button
                 onClick={() => setMode("login")}
                 className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                   mode === "login"
                     ? "bg-primary text-primary-foreground shadow-lg"
-                    : "text-muted-foreground hover:text-white"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Sign In
@@ -105,7 +104,7 @@ export default function Auth() {
                 className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
                   mode === "signup"
                     ? "bg-primary text-primary-foreground shadow-lg"
-                    : "text-muted-foreground hover:text-white"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 Sign Up
@@ -115,7 +114,7 @@ export default function Auth() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === "signup" && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="name" className="text-sm text-white/70">Full Name</Label>
+                  <Label htmlFor="name" className="text-sm">Full Name</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -125,14 +124,14 @@ export default function Auth() {
                       value={formData.fullName}
                       onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                       required={mode === "signup"}
-                      className="pl-10 h-12 bg-white/5 border-white/10 focus:border-primary/50 text-white placeholder:text-white/30"
+                      className="pl-10 h-12"
                     />
                   </div>
                 </div>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm text-white/70">Email</Label>
+                <Label htmlFor="email" className="text-sm">Email</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -142,13 +141,13 @@ export default function Auth() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     required
-                    className="pl-10 h-12 bg-white/5 border-white/10 focus:border-primary/50 text-white placeholder:text-white/30"
+                    className="pl-10 h-12"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm text-white/70">Password</Label>
+                <Label htmlFor="password" className="text-sm">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -159,14 +158,14 @@ export default function Auth() {
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     required
                     minLength={6}
-                    className="pl-10 h-12 bg-white/5 border-white/10 focus:border-primary/50 text-white placeholder:text-white/30"
+                    className="pl-10 h-12"
                   />
                 </div>
               </div>
 
               <Button 
                 type="submit" 
-                className="w-full h-12 gradient-animated text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all group"
+                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all group"
                 disabled={isLoading}
               >
                 {isLoading ? (

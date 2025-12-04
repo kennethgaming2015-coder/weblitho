@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
+    --background: 0 0% 100%;
     --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
@@ -18,14 +18,14 @@
     --primary: 217 89% 61%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 214 32% 91%;
+    --secondary: 214 32% 96%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 214 32% 91%;
+    --muted: 214 32% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 217 89% 61%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 214 32% 96%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -36,7 +36,7 @@
 
     --radius: 0.75rem;
     
-    --editor-bg: 214 32% 96%;
+    --editor-bg: 214 32% 98%;
     --canvas-bg: 0 0% 100%;
   }
 
@@ -90,22 +90,30 @@
 }
 
 @layer utilities {
-  /* Glassmorphism */
+  /* Glassmorphism - Light mode friendly */
   .glass {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+    @apply bg-white/70 backdrop-blur-xl border border-border/50 shadow-sm;
   }
   
   .glass-strong {
-    @apply bg-white/10 backdrop-blur-2xl border border-white/20;
+    @apply bg-white/90 backdrop-blur-2xl border border-border/50 shadow-lg;
+  }
+
+  .dark .glass {
+    @apply bg-white/5 border-white/10;
+  }
+  
+  .dark .glass-strong {
+    @apply bg-white/10 border-white/20;
   }
 
   /* Gradient Text */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary via-blue-500 to-primary bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent;
   }
 
   .gradient-text-warm {
-    @apply bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent;
   }
 
   /* Animated Gradients */
@@ -122,11 +130,11 @@
 
   /* Glow Effects */
   .glow-primary {
-    box-shadow: 0 0 40px hsl(217 89% 61% / 0.3), 0 0 80px hsl(217 89% 61% / 0.1);
+    box-shadow: 0 0 40px hsl(217 89% 61% / 0.2), 0 0 80px hsl(217 89% 61% / 0.1);
   }
 
   .glow-blue {
-    box-shadow: 0 0 40px hsl(217 89% 61% / 0.3), 0 0 80px hsl(217 89% 61% / 0.1);
+    box-shadow: 0 0 40px hsl(217 89% 61% / 0.2), 0 0 80px hsl(217 89% 61% / 0.1);
   }
 
   /* Scrollbar */
@@ -140,15 +148,23 @@
   }
   
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    @apply bg-white/10 rounded-full;
+    @apply bg-border rounded-full;
   }
   
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    @apply bg-white/20;
+    @apply bg-muted-foreground/30;
   }
 
-  /* Hero Background */
+  /* Hero Background - Light mode */
   .hero-mesh {
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(217 89% 61% / 0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 50%, hsl(217 89% 55% / 0.06), transparent),
+      radial-gradient(ellipse 50% 30% at 20% 80%, hsl(230 89% 65% / 0.06), transparent),
+      linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(214 32% 98%) 100%);
+  }
+
+  .dark .hero-mesh {
     background: 
       radial-gradient(ellipse 80% 50% at 50% -20%, hsl(217 89% 61% / 0.15), transparent),
       radial-gradient(ellipse 60% 40% at 80% 50%, hsl(217 89% 55% / 0.1), transparent),
@@ -159,9 +175,15 @@
   /* Grid Pattern */
   .grid-pattern {
     background-image: 
+      linear-gradient(to right, hsl(214 32% 91% / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(214 32% 91% / 0.5) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .dark .grid-pattern {
+    background-image: 
       linear-gradient(to right, hsl(217 33% 20% / 0.5) 1px, transparent 1px),
       linear-gradient(to bottom, hsl(217 33% 20% / 0.5) 1px, transparent 1px);
-    background-size: 40px 40px;
   }
 
   /* Noise texture */
@@ -173,7 +195,7 @@
     position: absolute;
     inset: 0;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-    opacity: 0.03;
+    opacity: 0.02;
     pointer-events: none;
   }
 
@@ -189,8 +211,8 @@
   }
 
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px hsl(217 89% 61% / 0.2); }
-    50% { box-shadow: 0 0 40px hsl(217 89% 61% / 0.4); }
+    0%, 100% { box-shadow: 0 0 20px hsl(217 89% 61% / 0.15); }
+    50% { box-shadow: 0 0 40px hsl(217 89% 61% / 0.25); }
   }
 
   @keyframes shimmer {
