@@ -32,8 +32,6 @@ export interface CreditTransaction {
 // Model credit multipliers - paid models cost more
 export const MODEL_CREDIT_MULTIPLIERS: Record<ModelType, number> = {
   "deepseek-free": 1,              // Free model - base cost
-  "google/gemini-2.0-flash": 1.5,  // 1.5x cost
-  "google/gemini-2.0-pro": 2,      // 2x cost
   "google/gemini-2.5-flash": 1.5,  // 1.5x cost
   "google/gemini-2.5-pro": 2.5,    // 2.5x cost (premium)
 };

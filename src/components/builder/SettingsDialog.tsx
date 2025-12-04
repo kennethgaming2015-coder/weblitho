@@ -22,11 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 
 // Model type mapping - internal API models
 export type ModelType = 
-  | "deepseek-free"                // DeepSeek Free
-  | "google/gemini-2.0-flash"      // Weblitho 2.0
-  | "google/gemini-2.0-pro"        // Weblitho 2.0 Premium
-  | "google/gemini-2.5-pro"        // Weblitho 2.5 Ultra
-  | "google/gemini-2.5-flash";     // Weblitho 2.5 Fast
+  | "deepseek-free"                // DeepSeek Free (OpenRouter)
+  | "google/gemini-2.5-flash"      // Weblitho Fast
+  | "google/gemini-2.5-pro";       // Weblitho Pro
 
 // Model display configuration
 const modelConfig: Record<ModelType, { name: string; description: string; badge?: string | null; badgeColor?: string }> = {
@@ -36,29 +34,17 @@ const modelConfig: Record<ModelType, { name: string; description: string; badge?
     badge: "FREE",
     badgeColor: "bg-green-500/10 text-green-500"
   },
-  "google/gemini-2.0-flash": {
-    name: "Weblitho 2.0",
+  "google/gemini-2.5-flash": {
+    name: "Weblitho Fast",
     description: "🚀 Balanced speed and quality",
-    badge: null,
-    badgeColor: ""
-  },
-  "google/gemini-2.0-pro": {
-    name: "Weblitho 2.0 Premium",
-    description: "💎 Higher quality for complex projects",
-    badge: "PREMIUM",
-    badgeColor: "bg-amber-500/10 text-amber-500"
+    badge: "FAST",
+    badgeColor: "bg-blue-500/10 text-blue-500"
   },
   "google/gemini-2.5-pro": {
-    name: "Weblitho 2.5 Ultra",
+    name: "Weblitho Pro",
     description: "🏆 Best quality for premium websites",
-    badge: "ULTRA",
+    badge: "PRO",
     badgeColor: "bg-purple-500/10 text-purple-500"
-  },
-  "google/gemini-2.5-flash": {
-    name: "Weblitho 2.5 Fast",
-    description: "⚡ Latest model with fast generation",
-    badge: "NEW",
-    badgeColor: "bg-blue-500/10 text-blue-500"
   }
 };
 
