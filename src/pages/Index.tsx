@@ -397,8 +397,11 @@ const Index = () => {
                 }
                 
                 // Try to extract preview HTML for real-time preview
+                // Clean thinking tokens first
+                let cleanedStream = assistantSoFar.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                
                 // Look for HTML in the streamed content
-                const htmlMatch = assistantSoFar.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);
+                const htmlMatch = cleanedStream.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);
                 if (htmlMatch) {
                   setGeneratedContent({ 
                     type: "web", 
@@ -406,16 +409,18 @@ const Index = () => {
                     files: []
                   });
                 } else {
-                  // Try to extract from JSON preview field
-                  const previewMatch = assistantSoFar.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*}|$)/);
+                  // Try to extract from JSON preview field (handles escaped HTML)
+                  const previewMatch = cleanedStream.match(/"preview"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                   if (previewMatch) {
                     try {
                       const previewHtml = JSON.parse('"' + previewMatch[1] + '"');
-                      setGeneratedContent({ 
-                        type: "web", 
-                        preview: previewHtml,
-                        files: []
-                      });
+                      if (previewHtml.includes('<html') || previewHtml.includes('<!DOCTYPE')) {
+                        setGeneratedContent({ 
+                          type: "web", 
+                          preview: previewHtml,
+                          files: []
+                        });
+                      }
                     } catch {
                       // Keep showing partial content
                     }
@@ -433,19 +438,60 @@ const Index = () => {
         let finalPreview = "";
         let finalFiles: ProjectFile[] = [];
         
+        // Clean the output: strip markdown fences, thinking tokens, etc.
+        let cleanedOutput = assistantSoFar;
+        
+        // Remove thinking tokens like <think>...</think>
+        cleanedOutput = cleanedOutput.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        
+        // Remove markdown code fences
+        cleanedOutput = cleanedOutput.replace(/```json\s*/gi, '');
+        cleanedOutput = cleanedOutput.replace(/```\s*/gi, '');
+        
+        // Trim whitespace
+        cleanedOutput = cleanedOutput.trim();
+        
+        // Find JSON object in the output
+        const jsonStartIndex = cleanedOutput.indexOf('{"files"');
+        if (jsonStartIndex !== -1) {
+          cleanedOutput = cleanedOutput.slice(jsonStartIndex);
+        }
+        
         try {
           // Try to parse as JSON with files and preview
-          const jsonOutput = JSON.parse(assistantSoFar);
+          const jsonOutput = JSON.parse(cleanedOutput);
           if (jsonOutput.preview && jsonOutput.files) {
             finalPreview = jsonOutput.preview;
             finalFiles = jsonOutput.files;
+          } else if (jsonOutput.files && Array.isArray(jsonOutput.files)) {
+            // Has files but no preview - extract HTML from files or generate simple preview
+            finalFiles = jsonOutput.files;
+            const pageFile = jsonOutput.files.find((f: ProjectFile) => f.path === 'app/page.tsx' || f.path.endsWith('page.tsx'));
+            if (pageFile) {
+              // Create a simple preview message
+              finalPreview = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-950 text-white p-8"><div class="max-w-4xl mx-auto text-center"><h1 class="text-4xl font-bold mb-4">Website Generated Successfully</h1><p class="text-gray-400 mb-8">Your Next.js project has been created with ${jsonOutput.files.length} files.</p><p class="text-sm text-gray-500">Use the File Tree panel to view the generated code, or Export to download the project.</p></div></body></html>`;
+            }
           } else if (typeof jsonOutput === "string") {
             finalPreview = jsonOutput;
           }
         } catch {
-          // Not JSON, treat as HTML directly
-          const htmlMatch = assistantSoFar.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-          finalPreview = htmlMatch ? htmlMatch[0] : assistantSoFar;
+          // Not valid JSON, try to extract HTML directly
+          const htmlMatch = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+          if (htmlMatch) {
+            finalPreview = htmlMatch[0];
+          } else {
+            // Check if there's a preview field we can extract with regex
+            const previewMatch = cleanedOutput.match(/"preview"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+            if (previewMatch) {
+              try {
+                finalPreview = JSON.parse('"' + previewMatch[1] + '"');
+              } catch {
+                finalPreview = cleanedOutput;
+              }
+            } else {
+              finalPreview = cleanedOutput;
+            }
+          }
         }
 
         setGeneratedContent({ 
