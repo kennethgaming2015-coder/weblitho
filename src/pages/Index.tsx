@@ -322,11 +322,15 @@ const Index = () => {
         // Include current code for modifications (use preview HTML)
         const currentCode = generatedContent?.type === "web" ? generatedContent.preview : null;
         
+        // Get user's session token for authentication (required for premium models)
+        const { data: { session } } = await supabase.auth.getSession();
+        const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        
         const resp = await fetch(CHAT_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify({
             prompt: message,
