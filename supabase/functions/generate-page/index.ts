@@ -11,7 +11,7 @@ const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: 
   // Free model uses OpenRouter - DeepSeek R1T2 Chimera
   "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false },
   // Premium models use Google Gemini API directly
-  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-05-20", requiresPaid: true },
+  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-04-17", requiresPaid: true },
   "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro-preview-05-06", requiresPaid: true },
 };
 
