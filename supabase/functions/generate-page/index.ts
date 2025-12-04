@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,12 +7,17 @@ const corsHeaders = {
 };
 
 // Model mapping: frontend names to actual model IDs
-const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string }> = {
+const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string; requiresPaid: boolean }> = {
   // Free model uses OpenRouter - DeepSeek R1T2 Chimera
-  "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free" },
+  "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false },
   // Premium models use Google Gemini API directly
-  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-05-20" },
-  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro-preview-05-06" },
+  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-05-20", requiresPaid: true },
+  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro-preview-05-06", requiresPaid: true },
+};
+
+// Check if user has paid plan
+const isPaidPlan = (plan: string): boolean => {
+  return plan === 'pro' || plan === 'business' || plan === 'owner';
 };
 
 serve(async (req) => {
@@ -20,7 +26,58 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [], currentCode = null, model = "google/gemini-2.5-flash" } = await req.json();
+    const { prompt, conversationHistory = [], currentCode = null, model = "deepseek-free" } = await req.json();
+
+    // Get the actual model and provider
+    const modelConfig = MODEL_MAPPING[model] || MODEL_MAPPING["deepseek-free"];
+    
+    // Check user's plan for premium models
+    if (modelConfig.requiresPaid) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: "Authentication required for premium models" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ error: "Invalid authentication" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check user's subscription plan
+      const { data: credits, error: creditsError } = await supabase
+        .from("user_credits")
+        .select("plan, is_unlimited")
+        .eq("user_id", user.id)
+        .single();
+
+      if (creditsError || !credits) {
+        console.error("Failed to fetch user credits:", creditsError);
+        return new Response(
+          JSON.stringify({ error: "Failed to verify subscription" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if user has paid plan or is unlimited
+      if (!isPaidPlan(credits.plan) && !credits.is_unlimited) {
+        return new Response(
+          JSON.stringify({ error: "This model requires a Pro or Business plan. Please upgrade to access premium models." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     // Detect if this is a modification request or new generation
     const isModification = currentCode !== null && currentCode.length > 100;
@@ -29,9 +86,6 @@ serve(async (req) => {
     const systemPrompt = isModification 
       ? buildModificationPrompt(currentCode)
       : buildGenerationPrompt();
-
-    // Get the actual model and provider
-    const modelConfig = MODEL_MAPPING[model] || { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free" };
     
     console.log("Weblitho generating:", {
       requestedModel: model,

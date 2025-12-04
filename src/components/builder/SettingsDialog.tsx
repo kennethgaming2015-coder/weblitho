@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Zap, Shield, Sparkles } from "lucide-react";
+import { Settings, Shield, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,33 +26,55 @@ export type ModelType =
   | "google/gemini-2.5-flash"      // Weblitho Fast
   | "google/gemini-2.5-pro";       // Weblitho Pro
 
-// Model display configuration
-const modelConfig: Record<ModelType, { name: string; description: string; badge?: string | null; badgeColor?: string }> = {
+// Model display configuration with paid requirement
+const modelConfig: Record<ModelType, { 
+  name: string; 
+  description: string; 
+  badge?: string | null; 
+  badgeColor?: string;
+  requiresPaid: boolean;
+}> = {
   "deepseek-free": {
     name: "Weblitho Free",
     description: "⚡ Free generation powered by DeepSeek",
     badge: "FREE",
-    badgeColor: "bg-green-500/10 text-green-500"
+    badgeColor: "bg-green-500/10 text-green-500",
+    requiresPaid: false
   },
   "google/gemini-2.5-flash": {
     name: "Weblitho Fast",
     description: "🚀 Balanced speed and quality",
-    badge: "FAST",
-    badgeColor: "bg-blue-500/10 text-blue-500"
+    badge: "PRO",
+    badgeColor: "bg-blue-500/10 text-blue-500",
+    requiresPaid: true
   },
   "google/gemini-2.5-pro": {
     name: "Weblitho Pro",
     description: "🏆 Best quality for premium websites",
     badge: "PRO",
-    badgeColor: "bg-purple-500/10 text-purple-500"
+    badgeColor: "bg-purple-500/10 text-purple-500",
+    requiresPaid: true
   }
+};
+
+// Helper to check if user has paid plan
+export const isPaidPlan = (plan: string | undefined): boolean => {
+  return plan === 'pro' || plan === 'business' || plan === 'owner';
+};
+
+// Helper to check if model is accessible
+export const canAccessModel = (modelId: ModelType, plan: string | undefined): boolean => {
+  const config = modelConfig[modelId];
+  if (!config.requiresPaid) return true;
+  return isPaidPlan(plan);
 };
 
 interface SettingsDialogProps {
   onSettingsChange: (model: ModelType) => void;
+  userPlan?: string;
 }
 
-export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
+export const SettingsDialog = ({ onSettingsChange, userPlan }: SettingsDialogProps) => {
   const [open, setOpen] = useState(false);
   const [model, setModel] = useState<ModelType>("deepseek-free");
   const { toast } = useToast();
@@ -60,11 +82,40 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
   useEffect(() => {
     const savedModel = localStorage.getItem("ai_model") as ModelType;
     if (savedModel && modelConfig[savedModel]) {
-      setModel(savedModel);
+      // Check if user can still access the saved model
+      if (canAccessModel(savedModel, userPlan)) {
+        setModel(savedModel);
+      } else {
+        // Reset to free model if they can't access saved one
+        setModel("deepseek-free");
+        localStorage.setItem("ai_model", "deepseek-free");
+      }
     }
-  }, []);
+  }, [userPlan]);
+
+  const handleModelChange = (value: string) => {
+    const modelId = value as ModelType;
+    if (!canAccessModel(modelId, userPlan)) {
+      toast({
+        title: "Upgrade Required",
+        description: "This model requires a Pro or Business plan",
+        variant: "destructive",
+      });
+      return;
+    }
+    setModel(modelId);
+  };
 
   const handleSave = () => {
+    if (!canAccessModel(model, userPlan)) {
+      toast({
+        title: "Upgrade Required",
+        description: "This model requires a Pro or Business plan",
+        variant: "destructive",
+      });
+      return;
+    }
+
     localStorage.setItem("ai_model", model);
     onSettingsChange(model);
 
@@ -77,6 +128,8 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
 
     setOpen(false);
   };
+
+  const hasPaidPlan = isPaidPlan(userPlan);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -120,31 +173,49 @@ export const SettingsDialog = ({ onSettingsChange }: SettingsDialogProps) => {
               </p>
               <Select 
                 value={model}
-                onValueChange={(value) => setModel(value as ModelType)}
+                onValueChange={handleModelChange}
               >
                 <SelectTrigger className="bg-background/50 backdrop-blur">
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(modelConfig) as [ModelType, typeof modelConfig[ModelType]][]).map(([modelId, config]) => (
-                    <SelectItem key={modelId} value={modelId}>
-                      <div className="flex flex-col items-start gap-1 py-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{config.name}</span>
-                          {config.badge && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${config.badgeColor}`}>
-                              {config.badge}
-                            </span>
-                          )}
+                  {(Object.entries(modelConfig) as [ModelType, typeof modelConfig[ModelType]][]).map(([modelId, config]) => {
+                    const isLocked = config.requiresPaid && !hasPaidPlan;
+                    return (
+                      <SelectItem 
+                        key={modelId} 
+                        value={modelId}
+                        disabled={isLocked}
+                        className={isLocked ? "opacity-60" : ""}
+                      >
+                        <div className="flex flex-col items-start gap-1 py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{config.name}</span>
+                            {config.badge && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${config.badgeColor}`}>
+                                {config.badge}
+                              </span>
+                            )}
+                            {isLocked && (
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {isLocked ? "🔒 Requires Pro or Business plan" : config.description}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {config.description}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+              
+              {!hasPaidPlan && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  <Lock className="h-3 w-3 inline mr-1" />
+                  Upgrade to Pro or Business to unlock Fast and Pro models
+                </p>
+              )}
             </div>
           </div>
         </div>
