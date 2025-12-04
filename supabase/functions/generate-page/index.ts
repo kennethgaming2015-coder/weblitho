@@ -6,14 +6,12 @@ const corsHeaders = {
 };
 
 // Model mapping: frontend names to actual model IDs
-const MODEL_MAPPING: Record<string, { provider: "openrouter" | "lovable"; model: string }> = {
+const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string }> = {
   // Free model uses OpenRouter - DeepSeek R1T2 Chimera
   "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free" },
-  // Premium models use Lovable AI Gateway
-  "google/gemini-2.0-flash": { provider: "lovable", model: "google/gemini-2.0-flash" },
-  "google/gemini-2.0-pro": { provider: "lovable", model: "google/gemini-2.5-pro" },
-  "google/gemini-2.5-pro": { provider: "lovable", model: "google/gemini-2.5-pro" },
-  "google/gemini-2.5-flash": { provider: "lovable", model: "google/gemini-2.5-flash" },
+  // Premium models use Google Gemini API directly
+  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-05-20" },
+  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro-preview-05-06" },
 };
 
 serve(async (req) => {
@@ -22,7 +20,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [], currentCode = null, model = "google/gemini-2.0-flash" } = await req.json();
+    const { prompt, conversationHistory = [], currentCode = null, model = "google/gemini-2.5-flash" } = await req.json();
 
     // Detect if this is a modification request or new generation
     const isModification = currentCode !== null && currentCode.length > 100;
@@ -42,12 +40,6 @@ serve(async (req) => {
       mode: isModification ? "MODIFICATION" : "NEW"
     });
 
-    const messages = [
-      { role: "system", content: systemPrompt },
-      ...conversationHistory,
-      { role: "user", content: prompt }
-    ];
-
     let response: Response;
 
     if (modelConfig.provider === "openrouter") {
@@ -56,6 +48,12 @@ serve(async (req) => {
       if (!OPENROUTER_KEY) {
         throw new Error("OPENROUTER_KEY is not configured");
       }
+
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...conversationHistory,
+        { role: "user", content: prompt }
+      ];
 
       response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -72,22 +70,45 @@ serve(async (req) => {
         }),
       });
     } else {
-      // Use Lovable AI Gateway for premium models
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        throw new Error("LOVABLE_API_KEY is not configured");
+      // Use Google Gemini API directly with user's API key
+      const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+      if (!GEMINI_API_KEY) {
+        throw new Error("GEMINI_API_KEY is not configured");
       }
 
-      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      // Convert conversation history to Gemini format
+      const contents = [];
+      
+      // Add conversation history
+      for (const msg of conversationHistory) {
+        contents.push({
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: [{ text: msg.content }]
+        });
+      }
+      
+      // Add current user prompt with system instruction
+      contents.push({
+        role: "user",
+        parts: [{ text: prompt }]
+      });
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.model}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
+
+      response = await fetch(geminiUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: modelConfig.model,
-          messages,
-          stream: true,
+          contents,
+          systemInstruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 65536,
+          }
         }),
       });
     }
