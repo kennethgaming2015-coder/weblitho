@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Send, Paperclip, FileText, X, Wand2, Globe, Layout, Box, Database, ArrowRight } from "lucide-react";
+import { Send, Paperclip, FileText, X, Wand2, Globe, Layout, Box, Database, ArrowRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { ModelType, modelConfig } from "@/components/builder/SettingsDialog";
+import { ModelType, modelConfig, canAccessModel, isPaidPlan } from "@/components/builder/SettingsDialog";
 import { TemplateGallery } from "@/components/builder/TemplateGallery";
 import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { useToast } from "@/hooks/use-toast";
@@ -20,13 +20,15 @@ interface ChatHeroProps {
   isGenerating?: boolean;
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;
+  userPlan?: string;
 }
 
 export const ChatHero = ({ 
   onSubmit, 
   isGenerating = false,
   selectedModel,
-  onModelChange 
+  onModelChange,
+  userPlan 
 }: ChatHeroProps) => {
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -154,23 +156,46 @@ export const ChatHero = ({
                 <div className="flex items-center gap-3">
                   <Wand2 className="h-4 w-4 text-primary" />
                   <span className="text-sm text-muted-foreground">Model:</span>
-                  <Select value={selectedModel} onValueChange={(v) => onModelChange(v as ModelType)}>
+                  <Select 
+                    value={selectedModel} 
+                    onValueChange={(v) => {
+                      const modelId = v as ModelType;
+                      if (!canAccessModel(modelId, userPlan)) {
+                        toast({
+                          title: "Upgrade Required",
+                          description: "This model requires a Pro or Business plan",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      onModelChange(modelId);
+                    }}
+                  >
                     <SelectTrigger className="h-8 w-[200px] bg-background border-border text-sm">
                       <SelectValue>{currentModel.name}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {(Object.entries(modelConfig) as [ModelType, typeof modelConfig[ModelType]][]).map(([id, cfg]) => (
-                        <SelectItem key={id} value={id}>
-                          <div className="flex items-center gap-2">
-                            <span>{cfg.name}</span>
-                            {cfg.badge && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${cfg.badgeColor}`}>
-                                {cfg.badge}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
+                      {(Object.entries(modelConfig) as [ModelType, typeof modelConfig[ModelType]][]).map(([id, cfg]) => {
+                        const isLocked = cfg.requiresPaid && !isPaidPlan(userPlan);
+                        return (
+                          <SelectItem 
+                            key={id} 
+                            value={id}
+                            disabled={isLocked}
+                            className={isLocked ? "opacity-60" : ""}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span>{cfg.name}</span>
+                              {cfg.badge && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${cfg.badgeColor}`}>
+                                  {cfg.badge}
+                                </span>
+                              )}
+                              {isLocked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>

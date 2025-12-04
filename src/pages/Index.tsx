@@ -697,6 +697,7 @@ const Index = () => {
             isGenerating={isGenerating}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
+            userPlan={credits?.plan}
           />
           
           {/* Recent Projects Section */}
