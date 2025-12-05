@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, createSearchParams } from 'react-router-dom';
 import { Plus, FolderOpen, Trash2, Clock, MoreVertical, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -58,12 +58,18 @@ const Dashboard = () => {
   const handleNewProject = async () => {
     const project = await createProject({ name: 'Untitled Project' });
     if (project) {
-      navigate(`/?project=${project.id}`);
+      navigate({
+        pathname: '/',
+        search: createSearchParams({ project: project.id }).toString()
+      });
     }
   };
 
   const handleOpenProject = (project: Project) => {
-    navigate(`/?project=${project.id}`);
+    navigate({
+      pathname: '/',
+      search: createSearchParams({ project: project.id }).toString()
+    });
   };
 
   const handleDeleteClick = (project: Project) => {
