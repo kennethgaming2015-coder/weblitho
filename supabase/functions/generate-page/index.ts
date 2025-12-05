@@ -214,20 +214,91 @@ serve(async (req) => {
 });
 
 // ===========================================
-// NEW GENERATION PROMPT - HTML First for Preview
+// NEW GENERATION PROMPT - Dual Output Format
 // ===========================================
 function buildGenerationPrompt(): string {
   return `You are Weblitho — Qubetics' AI Website Builder.
 
-OUTPUT FORMAT: You MUST output a complete, self-contained HTML document.
-START with: <!DOCTYPE html>
-END with: </html>
+OUTPUT FORMAT: You MUST output valid JSON with this exact structure:
+{
+  "files": [
+    { "path": "app/layout.tsx", "content": "..." },
+    { "path": "app/page.tsx", "content": "..." },
+    { "path": "components/layout/Navbar.tsx", "content": "..." },
+    ...more files
+  ],
+  "preview": "<!DOCTYPE html>...complete self-contained HTML..."
+}
 
-NO MARKDOWN. NO CODE FENCES. NO JSON. NO EXPLANATIONS. PURE HTML.
+NO MARKDOWN. NO CODE FENCES. ONLY THE JSON OBJECT.
 
 =========================================
-HTML STRUCTURE
+PROJECT STRUCTURE (files array)
 
+Generate a complete Next.js 14 App Router project:
+
+REQUIRED FILES:
+- app/layout.tsx (root layout with metadata, fonts, providers)
+- app/page.tsx (main page importing all sections)
+- app/globals.css (Tailwind directives + custom styles)
+- components/layout/Navbar.tsx (sticky navigation with mobile menu)
+- components/layout/Footer.tsx (multi-column footer)
+- components/sections/Hero.tsx (large hero with CTAs)
+- components/sections/Features.tsx (bento grid with icons)
+- components/sections/CTA.tsx (call-to-action section)
+- tailwind.config.ts (Tailwind configuration)
+- package.json (dependencies)
+
+OPTIONAL FILES (include if relevant):
+- components/sections/Pricing.tsx
+- components/sections/Testimonials.tsx
+- components/sections/FAQ.tsx
+- components/sections/About.tsx
+- components/ui/Button.tsx
+- components/ui/Card.tsx
+- lib/utils.ts
+
+=========================================
+CODE REQUIREMENTS
+
+Each component file must:
+- Use "use client" directive when needed (for interactivity)
+- Import React and necessary hooks
+- Use TypeScript with proper types
+- Use Tailwind CSS classes only
+- Use Lucide React for icons: import { Icon } from "lucide-react"
+- Export default the component
+
+Example component:
+\`\`\`tsx
+"use client";
+import { ArrowRight, Sparkles } from "lucide-react";
+
+export default function Hero() {
+  return (
+    <section className="py-24 px-4">
+      <div className="max-w-7xl mx-auto text-center">
+        <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+          Build Faster
+        </h1>
+      </div>
+    </section>
+  );
+}
+\`\`\`
+
+=========================================
+PREVIEW HTML (preview field)
+
+The "preview" field must be a complete, self-contained HTML document that:
+- Starts with <!DOCTYPE html>
+- Ends with </html>
+- Uses Tailwind CDN: <script src="https://cdn.tailwindcss.com"></script>
+- Includes inline SVG icons (not external dependencies)
+- Matches the visual design of the Next.js files exactly
+- Is fully responsive and interactive
+
+Preview HTML structure:
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -242,12 +313,10 @@ HTML STRUCTURE
           animation: {
             'fade-in': 'fadeIn 0.5s ease-out',
             'slide-up': 'slideUp 0.5s ease-out',
-            'float': 'float 3s ease-in-out infinite',
           },
           keyframes: {
             fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
             slideUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
           }
         }
       }
@@ -256,11 +325,10 @@ HTML STRUCTURE
   <style>
     .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); }
     .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .glow { box-shadow: 0 0 40px rgba(6, 182, 212, 0.3); }
   </style>
 </head>
 <body class="antialiased bg-gray-950 text-white min-h-screen">
-  <!-- Full website content here using Tailwind CSS -->
+  <!-- All sections here -->
 </body>
 </html>
 
@@ -288,33 +356,22 @@ REQUIRED SECTIONS
 
 1. Navbar — sticky, glass morphism, mobile menu toggle
 2. Hero — large gradient headline, subtext, 2 CTA buttons
-3. Features — bento grid with icons (use SVG icons)
+3. Features — bento grid with icons
 4. CTA Section — gradient background, action button
 5. Footer — multi-column links, social icons
-
-Optional: Pricing, Testimonials, FAQ, About
-
-=========================================
-SVG ICONS
-
-Use inline SVG icons. Examples:
-- Arrow: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-- Check: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-- Star: <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
 
 =========================================
 CRITICAL RULES
 
-1. Output ONLY the HTML document
-2. Start with <!DOCTYPE html>
-3. End with </html>
-4. NO markdown code fences (\`\`\`)
-5. NO explanations before or after
-6. NO JSON format
+1. Output ONLY valid JSON (no markdown, no backticks)
+2. "files" array with complete Next.js project
+3. "preview" string with self-contained HTML
+4. Both must match visually
+5. All code must be production-ready
+6. No placeholder text like "Lorem ipsum"
 7. Make it fully responsive
-8. Include ALL sections in one HTML file
 
-Generate the complete HTML website now.`;
+Generate the complete JSON output now.`;
 }
 
 // ===========================================
@@ -323,24 +380,33 @@ Generate the complete HTML website now.`;
 function buildModificationPrompt(currentCode: string): string {
   return `You are Weblitho, modifying an EXISTING website.
 
-OUTPUT FORMAT: Return ONLY the complete modified HTML document.
-NO JSON for modifications. NO explanations. NO markdown.
-Start with <!DOCTYPE html> and end with </html>.
+OUTPUT FORMAT: You MUST output valid JSON with this exact structure:
+{
+  "files": [
+    { "path": "app/layout.tsx", "content": "..." },
+    { "path": "app/page.tsx", "content": "..." },
+    ...
+  ],
+  "preview": "<!DOCTYPE html>...complete modified HTML..."
+}
 
-CURRENT CODE:
+NO MARKDOWN. NO CODE FENCES. ONLY THE JSON OBJECT.
+
+CURRENT PREVIEW CODE:
 ${currentCode}
 
 MODIFICATION RULES:
-1. Make ONLY the requested changes
-2. PRESERVE everything else exactly
-3. Keep React CDN, Tailwind, Lucide stack
-4. Return the COMPLETE modified HTML
+1. Make ONLY the requested changes to the design/content
+2. PRESERVE the overall structure and styling
+3. Update BOTH the files array AND the preview HTML
+4. Ensure files and preview remain visually consistent
+5. Keep all existing sections unless asked to remove
 
 DO NOT:
-- Regenerate everything
-- Remove components unless asked
+- Regenerate everything from scratch
+- Remove components/sections unless asked
 - Change unrelated sections
-- Add explanations
+- Add explanations or markdown
 
-Return the modified HTML now.`;
+Return the modified JSON now.`;
 }
