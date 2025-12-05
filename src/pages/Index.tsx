@@ -450,48 +450,79 @@ const Index = () => {
         
         // Remove markdown code fences
         cleanedOutput = cleanedOutput.replace(/```json\s*/gi, '');
+        cleanedOutput = cleanedOutput.replace(/```html\s*/gi, '');
         cleanedOutput = cleanedOutput.replace(/```\s*/gi, '');
         
         // Trim whitespace
         cleanedOutput = cleanedOutput.trim();
         
-        // Find JSON object in the output
-        const jsonStartIndex = cleanedOutput.indexOf('{"files"');
-        if (jsonStartIndex !== -1) {
-          cleanedOutput = cleanedOutput.slice(jsonStartIndex);
-        }
-        
-        try {
+        // First, try to find direct HTML (for simpler/older responses)
+        const directHtmlMatch = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+        if (directHtmlMatch && !cleanedOutput.includes('"files"')) {
+          // Direct HTML output (not JSON)
+          finalPreview = directHtmlMatch[0];
+        } else {
           // Try to parse as JSON with files and preview
-          const jsonOutput = JSON.parse(cleanedOutput);
-          if (jsonOutput.preview && jsonOutput.files) {
-            finalPreview = jsonOutput.preview;
-            finalFiles = jsonOutput.files;
-          } else if (jsonOutput.files && Array.isArray(jsonOutput.files)) {
-            // Has files but no preview - extract HTML from files or generate simple preview
-            finalFiles = jsonOutput.files;
-            const pageFile = jsonOutput.files.find((f: ProjectFile) => f.path === 'app/page.tsx' || f.path.endsWith('page.tsx'));
-            if (pageFile) {
-              // Create a simple preview message
-              finalPreview = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-950 text-white p-8"><div class="max-w-4xl mx-auto text-center"><h1 class="text-4xl font-bold mb-4">Website Generated Successfully</h1><p class="text-gray-400 mb-8">Your Next.js project has been created with ${jsonOutput.files.length} files.</p><p class="text-sm text-gray-500">Use the File Tree panel to view the generated code, or Export to download the project.</p></div></body></html>`;
-            }
-          } else if (typeof jsonOutput === "string") {
-            finalPreview = jsonOutput;
-          }
-        } catch {
-          // Not valid JSON, try to extract HTML directly
-          const htmlMatch = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-          if (htmlMatch) {
-            finalPreview = htmlMatch[0];
-          } else {
-            // Check if there's a preview field we can extract with regex
-            const previewMatch = cleanedOutput.match(/"preview"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-            if (previewMatch) {
-              try {
-                finalPreview = JSON.parse('"' + previewMatch[1] + '"');
-              } catch {
-                finalPreview = cleanedOutput;
+          // Find JSON object in the output
+          const jsonStartIndex = cleanedOutput.indexOf('{');
+          if (jsonStartIndex !== -1) {
+            let jsonStr = cleanedOutput.slice(jsonStartIndex);
+            // Find the matching closing brace
+            let braceCount = 0;
+            let jsonEndIndex = -1;
+            for (let i = 0; i < jsonStr.length; i++) {
+              if (jsonStr[i] === '{') braceCount++;
+              if (jsonStr[i] === '}') braceCount--;
+              if (braceCount === 0) {
+                jsonEndIndex = i + 1;
+                break;
               }
+            }
+            if (jsonEndIndex !== -1) {
+              jsonStr = jsonStr.slice(0, jsonEndIndex);
+            }
+            
+            try {
+              const jsonOutput = JSON.parse(jsonStr);
+              if (jsonOutput.preview) {
+                finalPreview = jsonOutput.preview;
+              }
+              if (jsonOutput.files && Array.isArray(jsonOutput.files)) {
+                finalFiles = jsonOutput.files;
+              }
+              // If we have files but no preview, create a fallback
+              if (!finalPreview && finalFiles.length > 0) {
+                finalPreview = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preview</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-950 text-white p-8"><div class="max-w-4xl mx-auto text-center"><h1 class="text-4xl font-bold mb-4">Website Generated Successfully</h1><p class="text-gray-400 mb-8">Your Next.js project has been created with ${finalFiles.length} files.</p><p class="text-sm text-gray-500">Use the File Tree panel to view the generated code, or Export to download the project.</p></div></body></html>`;
+              }
+            } catch (parseError) {
+              console.log("JSON parse failed, trying regex extraction");
+              // Try regex extraction for preview field
+              const previewMatch = cleanedOutput.match(/"preview"\s*:\s*"((?:[^"\\]|\\[\s\S])*)"/);
+              if (previewMatch) {
+                try {
+                  finalPreview = JSON.parse('"' + previewMatch[1] + '"');
+                } catch {
+                  // If JSON.parse fails, try direct HTML extraction
+                  const htmlInside = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+                  if (htmlInside) {
+                    finalPreview = htmlInside[0];
+                  }
+                }
+              } else {
+                // Last resort: extract any HTML found
+                const htmlMatch = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+                if (htmlMatch) {
+                  finalPreview = htmlMatch[0];
+                } else {
+                  finalPreview = cleanedOutput;
+                }
+              }
+            }
+          } else {
+            // No JSON found, use raw HTML
+            const htmlMatch = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+            if (htmlMatch) {
+              finalPreview = htmlMatch[0];
             } else {
               finalPreview = cleanedOutput;
             }

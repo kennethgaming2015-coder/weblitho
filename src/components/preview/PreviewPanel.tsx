@@ -38,11 +38,28 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
   // Clean code - extract HTML content, strip any reasoning/thinking tokens
   const cleanCode = (() => {
     if (!code) return "";
-    const htmlStart = code.indexOf("<!DOCTYPE html>");
-    const htmlAltStart = code.indexOf("<html");
+    
+    // If code already starts with HTML, just clean and return
+    let cleaned = code;
+    
+    // Remove thinking tokens
+    cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    
+    // Try to find HTML directly
+    const htmlStart = cleaned.indexOf("<!DOCTYPE html>");
+    const htmlAltStart = cleaned.indexOf("<html");
     const startIndex = htmlStart !== -1 ? htmlStart : htmlAltStart;
-    if (startIndex === -1) return code;
-    return code.slice(startIndex);
+    
+    if (startIndex !== -1) {
+      const htmlEnd = cleaned.lastIndexOf("</html>");
+      if (htmlEnd !== -1) {
+        return cleaned.slice(startIndex, htmlEnd + 7);
+      }
+      return cleaned.slice(startIndex);
+    }
+    
+    // If no direct HTML found, return as-is (it might be plain HTML without doctype)
+    return cleaned;
   })();
 
   const isCodeComplete = cleanCode && cleanCode.includes("</html>");
