@@ -81,33 +81,36 @@ export const ChatInterface = ({
   const currentModel = modelConfig[selectedModel];
 
   return (
-    <div className="h-full flex flex-col bg-card/30">
+    <div className="h-full flex flex-col bg-card/50">
       {/* Header */}
-      <div className="flex-shrink-0 px-4 py-3 border-b border-border/50 bg-card/50 backdrop-blur-xl">
+      <div className="flex-shrink-0 px-5 py-4 border-b border-border/50 bg-card/80 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg glow-cyan">
-              <Sparkles className="h-4 w-4 text-white" />
+            <div className="h-10 w-10 rounded-2xl gradient-animated flex items-center justify-center shadow-glow">
+              <Sparkles className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">Weblitho AI</h3>
+              <h3 className="text-sm font-display font-semibold text-foreground">Weblitho AI</h3>
               <p className="text-xs text-muted-foreground">{currentModel?.name || "AI Assistant"}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs text-emerald-400">Online</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+            </span>
+            <span className="text-xs font-medium text-accent">Online</span>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4" ref={scrollRef}>
-        <div className="py-4 space-y-4">
+      <ScrollArea className="flex-1 px-5" ref={scrollRef}>
+        <div className="py-5 space-y-5">
           {messages.length === 0 && (
-            <div className="text-center py-8 animate-fade-in">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 mb-4">
-                <Sparkles className="h-6 w-6 text-primary" />
+            <div className="text-center py-10 animate-fade-in">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-5">
+                <Sparkles className="h-7 w-7 text-primary" />
               </div>
               <p className="text-sm text-muted-foreground">
                 Start a conversation to build something amazing
@@ -121,21 +124,21 @@ export const ChatInterface = ({
               className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"} animate-slide-up`}
             >
               {message.role === "assistant" && (
-                <div className="flex-shrink-0 w-7 h-7 rounded-lg gradient-animated flex items-center justify-center shadow-lg">
-                  <Sparkles className="h-3.5 w-3.5 text-white" />
+                <div className="flex-shrink-0 w-8 h-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg">
+                  <Sparkles className="h-4 w-4 text-primary-foreground" />
                 </div>
               )}
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
                     ? "bg-primary text-primary-foreground rounded-br-md"
-                    : "glass border-white/10 text-white rounded-bl-md"
+                    : "glass border-border/50 text-foreground rounded-bl-md"
                 }`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
               </div>
               {message.role === "user" && (
-                <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white/70 text-xs font-semibold border border-white/10">
+                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-muted flex items-center justify-center text-muted-foreground text-xs font-semibold border border-border/60">
                   U
                 </div>
               )}
@@ -144,13 +147,13 @@ export const ChatInterface = ({
 
           {isGenerating && (
             <div className="flex gap-3 animate-fade-in">
-              <div className="flex-shrink-0 w-7 h-7 rounded-lg gradient-animated flex items-center justify-center shadow-lg">
-                <Sparkles className="h-3.5 w-3.5 text-white" />
+              <div className="flex-shrink-0 w-8 h-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg">
+                <Sparkles className="h-4 w-4 text-primary-foreground" />
               </div>
-              <div className="glass border-white/10 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex items-center gap-2">
+              <div className="glass border-border/50 rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="flex items-center gap-3">
                   <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="text-sm text-white/70">Generating...</span>
+                  <span className="text-sm text-muted-foreground">Generating...</span>
                 </div>
               </div>
             </div>
@@ -159,16 +162,16 @@ export const ChatInterface = ({
 
         {/* Quick Actions */}
         {messages.length > 0 && !isGenerating && (
-          <div className="pb-4 animate-fade-in">
-            <p className="text-xs text-muted-foreground mb-2">Quick actions</p>
+          <div className="pb-5 animate-fade-in">
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Quick actions</p>
             <div className="flex flex-wrap gap-2">
               {quickActions.map((action, index) => (
                 <Button
                   key={index}
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => onSubmit(action.prompt)}
-                  className="h-8 px-3 text-xs glass border-white/10 hover:bg-white/10 text-white/70 hover:text-white"
+                  className="h-8 px-3 text-xs rounded-xl bg-card hover:bg-muted border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground transition-all"
                 >
                   <action.icon className="h-3 w-3 mr-1.5" />
                   {action.label}
@@ -180,17 +183,17 @@ export const ChatInterface = ({
       </ScrollArea>
 
       {/* Input Area */}
-      <div className="flex-shrink-0 p-4 border-t border-border/50 bg-card/50 backdrop-blur-xl">
+      <div className="flex-shrink-0 p-5 border-t border-border/50 bg-card/80 backdrop-blur-xl">
         {files.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">
             {files.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-white/80"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted border border-border/60 text-xs"
               >
                 <FileText className="h-3 w-3 text-primary" />
-                <span className="max-w-[100px] truncate">{file.name}</span>
-                <button onClick={() => removeFile(index)} className="hover:text-destructive">
+                <span className="max-w-[100px] truncate font-medium">{file.name}</span>
+                <button onClick={() => removeFile(index)} className="hover:text-destructive transition-colors">
                   <X className="h-3 w-3" />
                 </button>
               </div>
@@ -198,7 +201,7 @@ export const ChatInterface = ({
           </div>
         )}
         
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-3 items-end">
           <input
             ref={fileInputRef}
             type="file"
@@ -212,7 +215,7 @@ export const ChatInterface = ({
             size="icon"
             onClick={() => fileInputRef.current?.click()}
             disabled={isGenerating}
-            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-white hover:bg-white/10 rounded-xl"
+            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl"
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -222,14 +225,14 @@ export const ChatInterface = ({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="min-h-[40px] max-h-[120px] resize-none bg-white/5 border-white/10 focus:border-primary/50 text-sm text-white placeholder:text-white/30 rounded-xl"
+            className="min-h-[42px] max-h-[120px] resize-none bg-background border-border/60 focus:border-primary/50 text-sm placeholder:text-muted-foreground/60 rounded-xl"
             disabled={isGenerating}
           />
           
           <Button 
             onClick={handleSubmit} 
             size="icon"
-            className="h-10 w-10 shrink-0 rounded-xl gradient-animated text-white shadow-lg glow-cyan"
+            className="h-10 w-10 shrink-0 rounded-xl gradient-animated text-primary-foreground shadow-glow"
             disabled={isGenerating || (!input.trim() && files.length === 0)}
           >
             {isGenerating ? (
