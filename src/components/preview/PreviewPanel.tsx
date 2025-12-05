@@ -175,7 +175,8 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
                 srcDoc={cleanCode}
                 title="Preview"
                 className="w-full h-full border-none"
-                sandbox="allow-scripts allow-same-origin"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                style={{ pointerEvents: 'auto' }}
               />
             </div>
           </div>
