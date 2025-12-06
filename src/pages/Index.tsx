@@ -113,10 +113,20 @@ const Index = () => {
   }, [navigate]);
 
   // Load project from database if projectId is in URL
+  // Use a ref to track if we've already loaded this project
+  const loadedProjectIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
     if (projectId && projects.length > 0) {
+      // Only load from DB if this is a different project than what we've already loaded
+      // This prevents overwriting newly generated content
+      if (loadedProjectIdRef.current === projectId) {
+        return; // Already loaded this project, don't reload
+      }
+      
       const project = projects.find(p => p.id === projectId);
       if (project) {
+        loadedProjectIdRef.current = projectId;
         setProjectName(project.name);
         // Cast chat history roles to correct type
         const typedHistory = (project.chat_history || []).map(msg => ({
@@ -143,6 +153,9 @@ const Index = () => {
           });
         }
       }
+    } else if (!projectId) {
+      // Reset the loaded project ref when there's no project in URL
+      loadedProjectIdRef.current = null;
     }
   }, [projectId, projects]);
 
@@ -529,11 +542,32 @@ const Index = () => {
           }
         }
 
-        setGeneratedContent({ 
-          type: "web", 
-          preview: finalPreview,
-          files: finalFiles
-        });
+        // Debug logging
+        console.log("Generation complete - finalPreview length:", finalPreview.length);
+        console.log("Generation complete - finalFiles count:", finalFiles.length);
+        console.log("Preview starts with:", finalPreview.substring(0, 100));
+
+        // Set generated content if we have a preview
+        if (finalPreview && finalPreview.length > 0) {
+          setGeneratedContent({ 
+            type: "web", 
+            preview: finalPreview,
+            files: finalFiles
+          });
+        } else {
+          console.error("No preview content generated - raw output:", assistantSoFar.substring(0, 500));
+          toast({
+            title: "Generation Issue",
+            description: "Could not extract preview from AI response. Trying raw output.",
+            variant: "destructive"
+          });
+          // Fallback: use the raw output as preview
+          setGeneratedContent({ 
+            type: "web", 
+            preview: assistantSoFar,
+            files: []
+          });
+        }
         
         const updatedMessages = [...messages, { role: "user" as const, content: userMessage }, { 
           role: "assistant" as const, 
