@@ -39,11 +39,14 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
   const cleanCode = (() => {
     if (!code) return "";
     
-    // If code already starts with HTML, just clean and return
     let cleaned = code;
     
     // Remove thinking tokens
     cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    
+    // Remove markdown code fences
+    cleaned = cleaned.replace(/```html\s*/gi, '');
+    cleaned = cleaned.replace(/```\s*/gi, '');
     
     // Try to find HTML directly
     const htmlStart = cleaned.indexOf("<!DOCTYPE html>");
@@ -51,20 +54,23 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
     const startIndex = htmlStart !== -1 ? htmlStart : htmlAltStart;
     
     if (startIndex !== -1) {
-      const htmlEnd = cleaned.lastIndexOf("</html>");
+      let extracted = cleaned.slice(startIndex);
+      const htmlEnd = extracted.lastIndexOf("</html>");
       if (htmlEnd !== -1) {
-        return cleaned.slice(startIndex, htmlEnd + 7);
+        return extracted.slice(0, htmlEnd + 7);
       }
-      return cleaned.slice(startIndex);
+      // Return partial HTML (for streaming)
+      return extracted;
     }
     
-    // If no direct HTML found, return as-is (it might be plain HTML without doctype)
     return cleaned;
   })();
 
+  // Check if HTML is complete (has closing tag)
   const isCodeComplete = cleanCode && cleanCode.includes("</html>");
 
-  if (isGenerating && !isCodeComplete) {
+  // Show loader only if generating AND no partial preview yet
+  if (isGenerating && !cleanCode) {
     return <GenerationLoader status={generationStatus} isGenerating={isGenerating} />;
   }
 

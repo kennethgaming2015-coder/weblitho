@@ -15,7 +15,7 @@ import { ModelType, modelConfig } from "@/components/builder/SettingsDialog";
 
 interface ChatInterfaceProps {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
-  onSubmit: (message: string, files?: File[]) => void;
+  onSubmit: (message: string, files?: File[], model?: ModelType) => void;
   isGenerating?: boolean;
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;
@@ -42,7 +42,7 @@ export const ChatInterface = ({
 
   const handleSubmit = () => {
     if ((input.trim() || files.length > 0) && !isGenerating) {
-      onSubmit(input, files);
+      onSubmit(input, files, selectedModel);
       setInput("");
       setFiles([]);
     }
@@ -170,7 +170,7 @@ export const ChatInterface = ({
                   key={index}
                   variant="outline"
                   size="sm"
-                  onClick={() => onSubmit(action.prompt)}
+                  onClick={() => onSubmit(action.prompt, undefined, selectedModel)}
                   className="h-8 px-3 text-xs rounded-xl bg-card hover:bg-muted border-border/60 hover:border-primary/40 text-muted-foreground hover:text-foreground transition-all"
                 >
                   <action.icon className="h-3 w-3 mr-1.5" />
