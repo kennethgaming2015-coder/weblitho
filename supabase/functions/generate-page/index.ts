@@ -94,10 +94,8 @@ serve(async (req) => {
       mode: isModification ? "MODIFICATION" : "NEW"
     });
 
-    let response: Response;
-
     if (modelConfig.provider === "openrouter") {
-      // Use OpenRouter API for free model
+      // Use OpenRouter API for free model - streams in OpenAI format
       const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
       if (!OPENROUTER_KEY) {
         throw new Error("OPENROUTER_KEY is not configured");
@@ -109,7 +107,7 @@ serve(async (req) => {
         { role: "user", content: prompt }
       ];
 
-      response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${OPENROUTER_KEY}`,
@@ -123,8 +121,23 @@ serve(async (req) => {
           stream: true,
         }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("OpenRouter error:", response.status, errorText);
+        return new Response(
+          JSON.stringify({ error: "AI gateway error", details: errorText }),
+          { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // OpenRouter already uses OpenAI-compatible format, pass through
+      return new Response(response.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+
     } else {
-      // Use Google Gemini API directly with user's API key
+      // Use Google Gemini API - needs format conversion
       const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
       if (!GEMINI_API_KEY) {
         throw new Error("GEMINI_API_KEY is not configured");
@@ -141,7 +154,7 @@ serve(async (req) => {
         });
       }
       
-      // Add current user prompt with system instruction
+      // Add current user prompt
       contents.push({
         role: "user",
         parts: [{ text: prompt }]
@@ -149,7 +162,7 @@ serve(async (req) => {
 
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.model}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 
-      response = await fetch(geminiUrl, {
+      const response = await fetch(geminiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -165,41 +178,77 @@ serve(async (req) => {
           }
         }),
       });
-    }
 
-    if (!response.ok) {
-      if (response.status === 429) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Gemini API error:", response.status, errorText);
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          {
-            status: 429,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+          JSON.stringify({ error: "AI gateway error", details: errorText }),
+          { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Payment required. Please add credits." }),
-          {
-            status: 402,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+      // Transform Gemini SSE to OpenAI-compatible format
+      const transformedStream = new ReadableStream({
+        async start(controller) {
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+          const encoder = new TextEncoder();
+          
+          let buffer = "";
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+                break;
+              }
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+
+              for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                  const jsonStr = line.slice(6).trim();
+                  if (!jsonStr || jsonStr === "[DONE]") continue;
+
+                  try {
+                    const geminiData = JSON.parse(jsonStr);
+                    // Extract text from Gemini format
+                    const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    
+                    if (text) {
+                      // Convert to OpenAI format
+                      const openAIFormat = {
+                        choices: [{
+                          delta: { content: text },
+                          index: 0,
+                          finish_reason: null
+                        }]
+                      };
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`));
+                    }
+                  } catch (e) {
+                    // Skip malformed JSON
+                    console.error("Parse error:", e);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Stream error:", e);
+            controller.error(e);
           }
-        );
-      }
-      const errorText = await response.text();
-      console.error("AI API error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "AI gateway error", details: errorText }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
-      );
-    }
+      });
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+      return new Response(transformedStream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
 
   } catch (e) {
     console.error("Weblitho generate-page error:", e);
@@ -217,7 +266,7 @@ serve(async (req) => {
 // NEW GENERATION PROMPT - Simple HTML Output
 // ===========================================
 function buildGenerationPrompt(): string {
-  return `You are Weblitho — Qubetics' AI Website Builder.
+  return `You are Weblitho — an AI Website Builder.
 
 OUTPUT FORMAT: You MUST output a complete, self-contained HTML document.
 START with: <!DOCTYPE html>
