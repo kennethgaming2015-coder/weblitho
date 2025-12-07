@@ -355,13 +355,19 @@ const Index = () => {
         });
 
         if (!resp.ok) {
-          if (resp.status === 429) {
-            throw new Error("Rate limit exceeded. Please try again later.");
+          // Try to get error message from response
+          let errorMessage = "Failed to generate content";
+          try {
+            const errorData = await resp.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            // Use status-based message
+            if (resp.status === 429) errorMessage = "Rate limit exceeded. Please try again later.";
+            if (resp.status === 402) errorMessage = "Payment required. Please add credits.";
+            if (resp.status === 403) errorMessage = "This model requires a paid plan.";
+            if (resp.status === 401) errorMessage = "Please log in again.";
           }
-          if (resp.status === 402) {
-            throw new Error("Payment required. Please add credits to your workspace.");
-          }
-          throw new Error("Failed to generate content");
+          throw new Error(errorMessage);
         }
 
         if (!resp.body) throw new Error("No response body");
@@ -374,6 +380,7 @@ const Index = () => {
         let streamDone = false;
         let assistantSoFar = "";
         let chunkCount = 0;
+        let lastPreviewUpdate = 0;
 
         while (!streamDone) {
           const { done, value } = await reader.read();
@@ -413,33 +420,35 @@ const Index = () => {
                   setGenerationStatus("Finalizing your website...");
                 }
                 
-                // Try to extract preview HTML for real-time preview
-                // Clean thinking tokens first
-                let cleanedStream = assistantSoFar.replace(/<think>[\s\S]*?<\/think>/gi, '');
-                
-                // Look for HTML in the streamed content
-                const htmlMatch = cleanedStream.match(/<!DOCTYPE html>[\s\S]*?<\/html>/i);
-                if (htmlMatch) {
-                  setGeneratedContent({ 
-                    type: "web", 
-                    preview: htmlMatch[0],
-                    files: []
-                  });
-                } else {
-                  // Try to extract from JSON preview field (handles escaped HTML)
-                  const previewMatch = cleanedStream.match(/"preview"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                  if (previewMatch) {
-                    try {
-                      const previewHtml = JSON.parse('"' + previewMatch[1] + '"');
-                      if (previewHtml.includes('<html') || previewHtml.includes('<!DOCTYPE')) {
-                        setGeneratedContent({ 
-                          type: "web", 
-                          preview: previewHtml,
-                          files: []
-                        });
-                      }
-                    } catch {
-                      // Keep showing partial content
+                // Update preview every 20 chunks for performance
+                const now = Date.now();
+                if (now - lastPreviewUpdate > 500 || chunkCount % 20 === 0) {
+                  lastPreviewUpdate = now;
+                  
+                  // Clean thinking tokens
+                  let cleanedStream = assistantSoFar.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                  
+                  // Look for complete or partial HTML
+                  const completeMatch = cleanedStream.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+                  if (completeMatch) {
+                    setGeneratedContent({ 
+                      type: "web", 
+                      preview: completeMatch[0],
+                      files: []
+                    });
+                  } else {
+                    // Show partial HTML while streaming
+                    const partialMatch = cleanedStream.match(/<!DOCTYPE html>[\s\S]*/i);
+                    if (partialMatch && partialMatch[0].length > 200) {
+                      // Add closing tags for partial preview
+                      let partialHtml = partialMatch[0];
+                      if (!partialHtml.includes('</body>')) partialHtml += '</body>';
+                      if (!partialHtml.includes('</html>')) partialHtml += '</html>';
+                      setGeneratedContent({ 
+                        type: "web", 
+                        preview: partialHtml,
+                        files: []
+                      });
                     }
                   }
                 }
