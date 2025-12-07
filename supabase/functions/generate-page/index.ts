@@ -8,14 +8,11 @@ const corsHeaders = {
 
 // Model mapping: frontend names to actual model IDs
 const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string; requiresPaid: boolean }> = {
-  // Free model uses OpenRouter - DeepSeek R1T2 Chimera
   "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false },
-  // Premium models use Google Gemini API directly with your own API key
-  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash", requiresPaid: true },
-  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro", requiresPaid: true },
+  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-05-20", requiresPaid: true },
+  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro-preview-05-06", requiresPaid: true },
 };
 
-// Check if user has paid plan
 const isPaidPlan = (plan: string): boolean => {
   return plan === 'pro' || plan === 'business' || plan === 'owner';
 };
@@ -28,7 +25,10 @@ serve(async (req) => {
   try {
     const { prompt, conversationHistory = [], currentCode = null, model = "deepseek-free" } = await req.json();
 
-    // Get the actual model and provider
+    console.log("=== GENERATE-PAGE START ===");
+    console.log("Model requested:", model);
+    console.log("Has current code:", !!currentCode);
+
     const modelConfig = MODEL_MAPPING[model] || MODEL_MAPPING["deepseek-free"];
     
     // Check user's plan for premium models
@@ -55,7 +55,6 @@ serve(async (req) => {
         );
       }
 
-      // Check user's subscription plan
       const { data: credits, error: creditsError } = await supabase
         .from("user_credits")
         .select("plan, is_unlimited")
@@ -70,7 +69,6 @@ serve(async (req) => {
         );
       }
 
-      // Check if user has paid plan or is unlimited
       if (!isPaidPlan(credits.plan) && !credits.is_unlimited) {
         return new Response(
           JSON.stringify({ error: "This model requires a Pro or Business plan. Please upgrade to access premium models." }),
@@ -79,23 +77,14 @@ serve(async (req) => {
       }
     }
 
-    // Detect if this is a modification request or new generation
     const isModification = currentCode !== null && currentCode.length > 100;
+    const systemPrompt = isModification ? buildModificationPrompt(currentCode) : buildGenerationPrompt();
 
-    // Build the appropriate system prompt based on mode
-    const systemPrompt = isModification 
-      ? buildModificationPrompt(currentCode)
-      : buildGenerationPrompt();
-    
-    console.log("Weblitho generating:", {
-      requestedModel: model,
-      actualProvider: modelConfig.provider,
-      actualModel: modelConfig.model,
-      mode: isModification ? "MODIFICATION" : "NEW"
-    });
+    console.log("Provider:", modelConfig.provider);
+    console.log("Model:", modelConfig.model);
+    console.log("Mode:", isModification ? "MODIFICATION" : "NEW");
 
     if (modelConfig.provider === "openrouter") {
-      // Use OpenRouter API for free model - streams in OpenAI format
       const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
       if (!OPENROUTER_KEY) {
         throw new Error("OPENROUTER_KEY is not configured");
@@ -119,6 +108,7 @@ serve(async (req) => {
           model: modelConfig.model,
           messages,
           stream: true,
+          max_tokens: 16000,
         }),
       });
 
@@ -131,30 +121,32 @@ serve(async (req) => {
         );
       }
 
-      // OpenRouter already uses OpenAI-compatible format, pass through
+      console.log("OpenRouter streaming started");
+      
+      // Pass through OpenRouter stream directly (already OpenAI-compatible)
       return new Response(response.body, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive"
+        },
       });
 
     } else {
-      // Use Google Gemini API - needs format conversion
+      // Gemini API
       const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
       if (!GEMINI_API_KEY) {
         throw new Error("GEMINI_API_KEY is not configured");
       }
 
-      // Convert conversation history to Gemini format
       const contents = [];
-      
-      // Add conversation history
       for (const msg of conversationHistory) {
         contents.push({
           role: msg.role === "assistant" ? "model" : "user",
           parts: [{ text: msg.content }]
         });
       }
-      
-      // Add current user prompt
       contents.push({
         role: "user",
         parts: [{ text: prompt }]
@@ -162,16 +154,14 @@ serve(async (req) => {
 
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.model}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 
+      console.log("Calling Gemini:", geminiUrl.replace(GEMINI_API_KEY, "***"));
+
       const response = await fetch(geminiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents,
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
-          },
+          systemInstruction: { parts: [{ text: systemPrompt }] },
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 65536,
@@ -188,21 +178,24 @@ serve(async (req) => {
         );
       }
 
-      // Transform Gemini SSE to OpenAI-compatible format
+      console.log("Gemini streaming started");
+
+      // Transform Gemini SSE to OpenAI format
       const transformedStream = new ReadableStream({
         async start(controller) {
           const reader = response.body!.getReader();
           const decoder = new TextDecoder();
           const encoder = new TextEncoder();
-          
           let buffer = "";
 
           try {
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
+                // Send final DONE event
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
+                console.log("Gemini stream completed");
                 break;
               }
 
@@ -211,86 +204,87 @@ serve(async (req) => {
               buffer = lines.pop() || "";
 
               for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                  const jsonStr = line.slice(6).trim();
-                  if (!jsonStr || jsonStr === "[DONE]") continue;
+                if (!line.startsWith("data: ")) continue;
+                
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr || jsonStr === "[DONE]") continue;
 
-                  try {
-                    const geminiData = JSON.parse(jsonStr);
-                    // Extract text from Gemini format
-                    const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                    
-                    if (text) {
-                      // Convert to OpenAI format
-                      const openAIFormat = {
-                        choices: [{
-                          delta: { content: text },
-                          index: 0,
-                          finish_reason: null
-                        }]
-                      };
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`));
-                    }
-                  } catch (e) {
-                    // Skip malformed JSON
-                    console.error("Parse error:", e);
+                try {
+                  const geminiData = JSON.parse(jsonStr);
+                  const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                  
+                  if (text) {
+                    // Convert to OpenAI format
+                    const openAIFormat = {
+                      choices: [{
+                        delta: { content: text },
+                        index: 0,
+                        finish_reason: null
+                      }]
+                    };
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`));
                   }
+                } catch (parseErr) {
+                  // Skip malformed JSON
                 }
               }
             }
-          } catch (e) {
-            console.error("Stream error:", e);
-            controller.error(e);
+          } catch (streamErr) {
+            console.error("Stream error:", streamErr);
+            controller.error(streamErr);
           }
         }
       });
 
       return new Response(transformedStream, {
-        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive"
+        },
       });
     }
 
   } catch (e) {
-    console.error("Weblitho generate-page error:", e);
+    console.error("Generate-page error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
 // ===========================================
-// NEW GENERATION PROMPT - Simple HTML Output
+// GENERATION PROMPT
 // ===========================================
 function buildGenerationPrompt(): string {
-  return `You are Weblitho — an AI Website Builder.
+  return `You are Weblitho, a premium AI website builder.
 
-OUTPUT FORMAT: You MUST output a complete, self-contained HTML document.
-START with: <!DOCTYPE html>
-END with: </html>
+CRITICAL OUTPUT RULES:
+- Output ONLY a complete HTML document
+- Start with: <!DOCTYPE html>
+- End with: </html>
+- NO markdown code fences
+- NO JSON wrapper
+- NO explanations before or after
+- PURE HTML ONLY
 
-NO MARKDOWN. NO CODE FENCES. NO JSON. NO EXPLANATIONS. PURE HTML ONLY.
-
-=========================================
-HTML STRUCTURE
-
+TEMPLATE:
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Website Title</title>
+  <title>Page Title</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
           animation: {
-            'fade-in': 'fadeIn 0.5s ease-out',
-            'slide-up': 'slideUp 0.5s ease-out',
+            'fade-in': 'fadeIn 0.6s ease-out',
+            'slide-up': 'slideUp 0.6s ease-out',
             'float': 'float 3s ease-in-out infinite',
           },
           keyframes: {
@@ -303,93 +297,60 @@ HTML STRUCTURE
     }
   </script>
   <style>
-    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); }
     .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .glow { box-shadow: 0 0 40px rgba(6, 182, 212, 0.3); }
   </style>
 </head>
 <body class="antialiased bg-gray-950 text-white min-h-screen">
-  <!-- Full website content here using Tailwind CSS -->
+  <!-- Website content -->
 </body>
 </html>
 
-=========================================
-DESIGN REQUIREMENTS
-
-Create PREMIUM, MODERN websites like Vercel, Framer, Stripe, Linear.
-
-MANDATORY:
-- Large hero sections (text-5xl to text-7xl headlines)
-- Generous spacing (py-20 to py-32 for sections)
+DESIGN REQUIREMENTS:
+- Premium modern design like Vercel, Stripe, Linear
+- Large hero headlines (text-5xl to text-7xl)
+- Generous section spacing (py-20 to py-32)
 - max-w-7xl mx-auto containers
-- Premium gradients (cyan, purple, blue)
-- Rounded-2xl components
-- Smooth transitions (transition-all duration-300)
-- Responsive grids (grid-cols-1 md:grid-cols-2 lg:grid-cols-3)
-- Clean typography
-- Gray-950 base, white text
-- Glass morphism (backdrop-blur, bg-white/5)
-- Hover states on interactive elements
-- Dark theme
+- Soft gradients (cyan, purple, blue)
+- rounded-2xl components
+- Smooth hover transitions
+- Dark theme: gray-950 base
+- Glass morphism effects
+- Fully responsive
 
-=========================================
-REQUIRED SECTIONS
+REQUIRED SECTIONS:
+1. Sticky navbar with glass effect
+2. Hero with gradient headline, subtext, 2 CTA buttons
+3. Features in bento grid layout
+4. CTA section with gradient background
+5. Footer with columns
 
-1. Navbar — sticky, glass morphism, mobile menu toggle
-2. Hero — large gradient headline, subtext, 2 CTA buttons
-3. Features — bento grid with icons (use SVG icons)
-4. CTA Section — gradient background, action button
-5. Footer — multi-column links, social icons
+USE INLINE SVG ICONS - Examples:
+Arrow: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
 
-Optional: Pricing, Testimonials, FAQ, About
-
-=========================================
-SVG ICONS
-
-Use inline SVG icons. Examples:
-- Arrow: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
-- Check: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-- Star: <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-
-=========================================
-CRITICAL RULES
-
-1. Output ONLY the HTML document
-2. Start with <!DOCTYPE html>
-3. End with </html>
-4. NO markdown code fences (\`\`\`)
-5. NO explanations before or after
-6. NO JSON format
-7. Make it fully responsive
-8. Include ALL sections in one HTML file
-
-Generate the complete HTML website now.`;
+Generate beautiful, complete HTML now.`;
 }
 
 // ===========================================
-// MODIFICATION PROMPT - Changes existing code
+// MODIFICATION PROMPT
 // ===========================================
 function buildModificationPrompt(currentCode: string): string {
-  return `You are Weblitho, modifying an EXISTING website.
+  return `You are Weblitho, modifying an existing website.
 
-OUTPUT FORMAT: Return ONLY the complete modified HTML document.
-NO JSON. NO explanations. NO markdown.
-Start with <!DOCTYPE html> and end with </html>.
+OUTPUT: Return ONLY the complete modified HTML document.
+- Start with: <!DOCTYPE html>
+- End with: </html>
+- NO markdown, NO JSON, NO explanations
 
-CURRENT CODE:
+CURRENT WEBSITE CODE:
 ${currentCode}
 
-MODIFICATION RULES:
+RULES:
 1. Make ONLY the requested changes
 2. PRESERVE everything else exactly
-3. Keep Tailwind CDN and custom styles
+3. Keep all Tailwind CDN and custom styles
 4. Return the COMPLETE modified HTML
-
-DO NOT:
-- Regenerate everything from scratch
-- Remove components unless asked
-- Change unrelated sections
-- Add explanations or markdown
 
 Return the modified HTML now.`;
 }

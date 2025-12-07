@@ -16,6 +16,7 @@ import { PagesPanel } from "@/components/builder/PagesPanel";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
 import { Footer } from "@/components/layout/Footer";
 import { useCredits } from "@/hooks/useCredits";
+import { useStreamingGeneration } from "@/hooks/useStreamingGeneration";
 import { Moon, Sun, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
 import weblithoLogo from "@/assets/weblitho-logo.png";
 import { Button } from "@/components/ui/button";
@@ -71,12 +72,13 @@ const Index = () => {
   
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationStatus, setGenerationStatus] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<ModelType>("deepseek-free");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
+  
+  // Streaming generation hook
+  const streaming = useStreamingGeneration();
   const [showFileTree, setShowFileTree] = useState(true);
   const [selectedFileView, setSelectedFileView] = useState<{ name: string; content: string } | null>(null);
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
@@ -88,7 +90,7 @@ const Index = () => {
   const [showPagesPanel, setShowPagesPanel] = useState(true);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const abortControllerRef = useRef<AbortController | null>(null);
+  
   
   const { projects, loading: projectsLoading, createProject, updateProject, deleteProject, getProjectVersions, restoreVersion } = useProjects();
   const { credits, calculateCost, deductCredits } = useCredits();
@@ -292,12 +294,7 @@ const Index = () => {
   }
 
   const handleStop = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsGenerating(false);
-    setGenerationStatus("");
+    streaming.stop();
     toast({
       title: "Generation Stopped",
       description: "AI generation has been cancelled",
@@ -320,211 +317,41 @@ const Index = () => {
       : message;
     
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
-    setIsGenerating(true);
-    setGenerationStatus("Analyzing your request...");
     
-    // Create new abort controller for this generation
-    abortControllerRef.current = new AbortController();
+    // Include current code for modifications
+    const currentCode = generatedContent?.type === "web" ? generatedContent.preview : null;
     
-    try {
-      setGenerationStatus("Analyzing your request...");
-        
-        // Generate web page - streaming
-        const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-page`;
-        
-        // Include current code for modifications (use preview HTML)
-        const currentCode = generatedContent?.type === "web" ? generatedContent.preview : null;
-        
-        // Get user's session token for authentication (required for premium models)
-        const { data: { session } } = await supabase.auth.getSession();
-        const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-        
-        const resp = await fetch(CHAT_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            prompt: message,
-            conversationHistory: messages,
-            currentCode, // Pass current code for modifications
-            model: model || selectedModel,
-          }),
-          signal: abortControllerRef.current.signal,
+    // Start streaming generation
+    await streaming.generate({
+      prompt: message,
+      currentCode,
+      model: model || selectedModel,
+      conversationHistory: messages,
+      onChunk: (html) => {
+        // Update preview as chunks come in
+        setGeneratedContent({ 
+          type: "web", 
+          preview: html,
+          files: []
         });
-
-        if (!resp.ok) {
-          // Try to get error message from response
-          let errorMessage = "Failed to generate content";
-          try {
-            const errorData = await resp.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            // Use status-based message
-            if (resp.status === 429) errorMessage = "Rate limit exceeded. Please try again later.";
-            if (resp.status === 402) errorMessage = "Payment required. Please add credits.";
-            if (resp.status === 403) errorMessage = "This model requires a paid plan.";
-            if (resp.status === 401) errorMessage = "Please log in again.";
-          }
-          throw new Error(errorMessage);
-        }
-
-        if (!resp.body) throw new Error("No response body");
-
-        setGenerationStatus("Planning component structure...");
-
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder();
-        let textBuffer = "";
-        let streamDone = false;
-        let assistantSoFar = "";
-        let chunkCount = 0;
-        let lastPreviewUpdate = 0;
-
-        while (!streamDone) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          textBuffer += decoder.decode(value, { stream: true });
-
-          let newlineIndex: number;
-          while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
-            let line = textBuffer.slice(0, newlineIndex);
-            textBuffer = textBuffer.slice(newlineIndex + 1);
-
-            if (line.endsWith("\r")) line = line.slice(0, -1);
-            if (line.startsWith(":") || line.trim() === "") continue;
-            if (!line.startsWith("data: ")) continue;
-
-            const jsonStr = line.slice(6).trim();
-            if (jsonStr === "[DONE]") {
-              streamDone = true;
-              break;
-            }
-
-            try {
-              const parsed = JSON.parse(jsonStr);
-              const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-              if (content) {
-                assistantSoFar += content;
-                chunkCount++;
-                
-                // Update status based on content progress
-                if (chunkCount < 10) {
-                  setGenerationStatus("Planning component structure...");
-                } else if (chunkCount < 30) {
-                  setGenerationStatus("Writing React components...");
-                } else if (chunkCount < 60) {
-                  setGenerationStatus("Styling with Tailwind CSS...");
-                } else {
-                  setGenerationStatus("Finalizing your website...");
-                }
-                
-                // Update preview every 20 chunks for performance
-                const now = Date.now();
-                if (now - lastPreviewUpdate > 500 || chunkCount % 20 === 0) {
-                  lastPreviewUpdate = now;
-                  
-                  // Clean thinking tokens
-                  let cleanedStream = assistantSoFar.replace(/<think>[\s\S]*?<\/think>/gi, '');
-                  
-                  // Look for complete or partial HTML
-                  const completeMatch = cleanedStream.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-                  if (completeMatch) {
-                    setGeneratedContent({ 
-                      type: "web", 
-                      preview: completeMatch[0],
-                      files: []
-                    });
-                  } else {
-                    // Show partial HTML while streaming
-                    const partialMatch = cleanedStream.match(/<!DOCTYPE html>[\s\S]*/i);
-                    if (partialMatch && partialMatch[0].length > 200) {
-                      // Add closing tags for partial preview
-                      let partialHtml = partialMatch[0];
-                      if (!partialHtml.includes('</body>')) partialHtml += '</body>';
-                      if (!partialHtml.includes('</html>')) partialHtml += '</html>';
-                      setGeneratedContent({ 
-                        type: "web", 
-                        preview: partialHtml,
-                        files: []
-                      });
-                    }
-                  }
-                }
-              }
-            } catch {
-              textBuffer = line + "\n" + textBuffer;
-              break;
-            }
-          }
-        }
-
-        // Parse final output - extract HTML from streamed content
-        let finalPreview = "";
-        let finalFiles: ProjectFile[] = [];
+      },
+      onComplete: async (finalHtml) => {
+        console.log("Generation complete - preview length:", finalHtml.length);
         
-        // Clean the output: strip thinking tokens, markdown fences
-        let cleanedOutput = assistantSoFar;
+        // Set final content
+        setGeneratedContent({ 
+          type: "web", 
+          preview: finalHtml,
+          files: []
+        });
         
-        // Remove thinking tokens like <think>...</think>
-        cleanedOutput = cleanedOutput.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        
-        // Remove markdown code fences
-        cleanedOutput = cleanedOutput.replace(/```html\s*/gi, '');
-        cleanedOutput = cleanedOutput.replace(/```\s*/gi, '');
-        
-        // Trim whitespace
-        cleanedOutput = cleanedOutput.trim();
-        
-        // Extract HTML - look for complete HTML document
-        const htmlMatch = cleanedOutput.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-        if (htmlMatch) {
-          finalPreview = htmlMatch[0];
-        } else {
-          // Try to find HTML starting with <html> tag
-          const htmlAltMatch = cleanedOutput.match(/<html[\s\S]*<\/html>/i);
-          if (htmlAltMatch) {
-            finalPreview = "<!DOCTYPE html>\n" + htmlAltMatch[0];
-          } else {
-            // Use raw output as fallback
-            finalPreview = cleanedOutput;
-          }
-        }
-
-        console.log("Generation complete - preview length:", finalPreview.length);
-
-        // Set generated content if we have a preview
-        if (finalPreview && finalPreview.length > 0) {
-          setGeneratedContent({ 
-            type: "web", 
-            preview: finalPreview,
-            files: finalFiles
-          });
-        } else {
-          console.error("No preview content generated - raw output:", assistantSoFar.substring(0, 500));
-          toast({
-            title: "Generation Issue",
-            description: "Could not extract preview from AI response. Trying raw output.",
-            variant: "destructive"
-          });
-          // Fallback: use the raw output as preview
-          setGeneratedContent({ 
-            type: "web", 
-            preview: assistantSoFar,
-            files: []
-          });
-        }
-        
-        const updatedMessages = [...messages, { role: "user" as const, content: userMessage }, { 
-          role: "assistant" as const, 
-          content: "Generated beautiful website successfully ✨" 
-        }];
+        const updatedMessages = [...messages, 
+          { role: "user" as const, content: userMessage }, 
+          { role: "assistant" as const, content: "Generated beautiful website successfully ✨" }
+        ];
         setMessages(updatedMessages);
 
-        setGenerationStatus("Weblitho Validator checking code...");
-        
-        // Run validation with Weblitho Validator
+        // Run validation
         try {
           const validationResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/weblitho-validate`, {
             method: "POST",
@@ -532,7 +359,7 @@ const Index = () => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({ code: assistantSoFar }),
+            body: JSON.stringify({ code: finalHtml }),
           });
           
           if (validationResp.ok) {
@@ -540,30 +367,19 @@ const Index = () => {
             setValidation(validationResult);
             
             if (validationResult.score >= 90) {
-              toast({
-                title: "✅ Excellent Code Quality",
-                description: `Weblitho Validator: ${validationResult.score}/100`,
-              });
+              toast({ title: "✅ Excellent Code Quality", description: `Score: ${validationResult.score}/100` });
             } else if (validationResult.score >= 80) {
-              toast({
-                title: "✅ High Quality Code",
-                description: `Weblitho Validator: ${validationResult.score}/100`,
-              });
+              toast({ title: "✅ High Quality Code", description: `Score: ${validationResult.score}/100` });
             } else if (validationResult.score >= 60) {
-              toast({
-                title: "⚠️ Good Code with Suggestions",
-                description: `Weblitho Validator: ${validationResult.score}/100`,
-              });
+              toast({ title: "⚠️ Good Code with Suggestions", description: `Score: ${validationResult.score}/100` });
             }
           }
         } catch (validationError) {
-          console.log("Weblitho Validator skipped:", validationError);
+          console.log("Validation skipped:", validationError);
         }
 
-        setGenerationStatus("Saving project...");
-        
-        // Calculate and deduct credits based on output length and model
-        const outputLength = finalPreview.length;
+        // Deduct credits
+        const outputLength = finalHtml.length;
         const usedModel = model || selectedModel;
         const creditCost = calculateCost(outputLength, usedModel);
         const deducted = await deductCredits(creditCost, `Generated: ${message.slice(0, 50)}...`, projectId || undefined);
@@ -573,39 +389,26 @@ const Index = () => {
         }
         
         // Auto-save project
-        await saveProject(finalPreview, finalFiles, updatedMessages);
+        await saveProject(finalHtml, [], updatedMessages);
 
-        setGenerationStatus("Generation complete!");
-        
         toast({
           title: "Page Generated",
           description: "Your web page is ready",
         });
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.log("Generation aborted by user");
-        return;
+      },
+      onError: (errorMessage) => {
+        setMessages(prev => [...prev, { 
+          role: "assistant", 
+          content: `Sorry, I encountered an error: ${errorMessage}` 
+        }]);
+        
+        toast({
+          title: "Generation Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
       }
-      
-      console.error("Error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
-        content: `Sorry, I encountered an error: ${errorMessage}` 
-      }]);
-      
-      setGenerationStatus("");
-      
-      toast({
-        title: "Generation Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
-      setGenerationStatus("");
-      abortControllerRef.current = null;
-    }
+    });
   };
 
   const handleModelChange = (model: ModelType) => {
@@ -752,11 +555,11 @@ const Index = () => {
       </header>
 
       {/* Main Content */}
-      {!isGenerating && messages.length === 0 ? (
+      {!streaming.isGenerating && messages.length === 0 ? (
         <div className="flex flex-col min-h-[calc(100vh-3.5rem)]">
           <ChatHero 
             onSubmit={handleMessageSubmit}
-            isGenerating={isGenerating}
+            isGenerating={streaming.isGenerating}
             selectedModel={selectedModel}
             onModelChange={handleModelChange}
             userPlan={credits?.plan}
@@ -783,26 +586,26 @@ const Index = () => {
             <ChatInterface
               messages={messages}
               onSubmit={handleMessageSubmit}
-              isGenerating={isGenerating}
+              isGenerating={streaming.isGenerating}
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
             />
             
             {/* Generation Status */}
-            {isGenerating && generationStatus && (
+            {streaming.isGenerating && streaming.status && (
               <div className="px-4 py-3 border-t border-border/50 bg-primary/5 backdrop-blur-xl animate-fade-in">
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
                     <div className="absolute inset-0 h-2.5 w-2.5 rounded-full bg-primary animate-ping" />
                   </div>
-                  <span className="text-sm text-foreground/80 font-medium">{generationStatus}</span>
+                  <span className="text-sm text-foreground/80 font-medium">{streaming.status}</span>
                 </div>
               </div>
             )}
             
             {/* Stop Button */}
-            {isGenerating && (
+            {streaming.isGenerating && (
               <div className="px-4 py-3 border-t border-border/50 bg-card/50 animate-fade-in">
                 <Button 
                   onClick={handleStop}
@@ -817,7 +620,7 @@ const Index = () => {
           </div>
 
           {/* Pages Panel - Side Panel */}
-          {showPagesPanel && (generatedContent?.preview || isGenerating) && (
+          {showPagesPanel && (generatedContent?.preview || streaming.isGenerating) && (
             <div className="w-[180px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
               <PagesPanel
                 pages={pages}
@@ -831,7 +634,7 @@ const Index = () => {
           )}
 
           {/* File Tree - Side Panel */}
-          {showFileTree && (generatedContent?.preview || isGenerating) && (
+          {showFileTree && (generatedContent?.preview || streaming.isGenerating) && (
             <div className="w-[220px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
               <FileTree 
                 code={generatedContent?.preview || ""} 
@@ -847,7 +650,7 @@ const Index = () => {
           {/* Preview Panel - Right Side */}
           <div className="flex-1 overflow-hidden bg-card/20 flex flex-col">
             {/* Toolbar with View Toggle */}
-            {(generatedContent?.preview || isGenerating) && (
+            {(generatedContent?.preview || streaming.isGenerating) && (
               <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-card/50 backdrop-blur-xl shrink-0">
                 <div className="flex items-center gap-2">
                   <Button
@@ -898,12 +701,12 @@ const Index = () => {
             
             {/* Main Content Area */}
             <div className="flex-1 overflow-hidden">
-              {isGenerating ? (
+              {streaming.isGenerating ? (
                 <div className="h-full animate-fade-in">
                   <PreviewPanel
-                    code={generatedContent?.preview || ""}
-                    isGenerating={isGenerating}
-                    generationStatus={generationStatus}
+                    code={generatedContent?.preview || streaming.preview}
+                    isGenerating={streaming.isGenerating}
+                    generationStatus={streaming.status}
                     validation={null}
                   />
                 </div>
