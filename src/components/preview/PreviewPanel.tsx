@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, CheckCircle, AlertTriangle, ExternalLink } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Monitor, Smartphone, Tablet, Code2, Eye, Copy, Download, CheckCircle, AlertTriangle, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { GenerationLoader } from "./GenerationLoader";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +19,7 @@ interface PreviewPanelProps {
   metadata?: any;
   isGenerating?: boolean;
   generationStatus?: string;
+  generationProgress?: number;
   validation?: ValidationResult | null;
 }
 
@@ -31,19 +31,40 @@ const viewportDimensions = {
   desktop: { width: "100%", height: "100%" },
 };
 
-export const PreviewPanel = ({ code, isGenerating = false, generationStatus = "", validation }: PreviewPanelProps) => {
+export const PreviewPanel = ({ 
+  code, 
+  isGenerating = false, 
+  generationStatus = "", 
+  generationProgress = 0,
+  validation 
+}: PreviewPanelProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [activeTab, setActiveTab] = useState<"preview" | "code">("preview");
+  const [iframeKey, setIframeKey] = useState(0);
   const { toast } = useToast();
+  const lastCodeRef = useRef("");
 
   // Clean and extract HTML from code
   const cleanedHtml = cleanHtml(code);
   const hasContent = cleanedHtml.length > 100;
   const isComplete = cleanedHtml.includes("</html>");
 
+  // Refresh iframe when code changes significantly
+  useEffect(() => {
+    if (cleanedHtml && cleanedHtml !== lastCodeRef.current) {
+      // Only refresh if this is complete HTML or significant update
+      if (isComplete || cleanedHtml.length > lastCodeRef.current.length + 500) {
+        lastCodeRef.current = cleanedHtml;
+        // Small delay to batch updates
+        const timer = setTimeout(() => setIframeKey(k => k + 1), 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [cleanedHtml, isComplete]);
+
   // Show loader only when generating AND no preview content yet
   if (isGenerating && !hasContent) {
-    return <GenerationLoader status={generationStatus} isGenerating={isGenerating} />;
+    return <GenerationLoader status={generationStatus} isGenerating={isGenerating} progress={generationProgress} />;
   }
 
   // Empty state
@@ -83,6 +104,10 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
     const blob = new Blob([cleanedHtml], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
+  };
+
+  const handleRefresh = () => {
+    setIframeKey(k => k + 1);
   };
 
   const getScoreBadge = (score: number) => {
@@ -129,15 +154,18 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
         </div>
         
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={handleOpenInNewTab} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-white/10">
+          <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleOpenInNewTab} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted">
             <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
             <span className="text-xs hidden sm:inline">Open</span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-white/10">
+          <Button variant="ghost" size="sm" onClick={handleCopy} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted">
             <Copy className="h-3.5 w-3.5 mr-1.5" />
             <span className="text-xs hidden sm:inline">Copy</span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleDownload} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-white/10">
+          <Button variant="ghost" size="sm" onClick={handleDownload} className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             <span className="text-xs hidden sm:inline">Download</span>
           </Button>
@@ -146,7 +174,7 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
 
       {/* Tab Controls + Viewport */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-card/30 shrink-0">
-        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
           <Button
             variant={activeTab === "preview" ? "default" : "ghost"}
             size="sm"
@@ -167,7 +195,7 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
           </Button>
         </div>
 
-        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
           {(["mobile", "tablet", "desktop"] as ViewportSize[]).map((size) => {
             const icons = { mobile: Smartphone, tablet: Tablet, desktop: Monitor };
             const Icon = icons[size];
@@ -189,10 +217,10 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
       {/* Content */}
       <div className="flex-1 overflow-auto">
         {activeTab === "preview" ? (
-          <div className="h-full p-4 bg-[#0a0a0a]">
+          <div className="h-full p-4 bg-[#0f0f0f]">
             <div className="flex items-start justify-center min-h-full">
               <div
-                className="bg-white rounded-xl shadow-2xl transition-all duration-500 overflow-hidden border border-white/10"
+                className="bg-white rounded-xl shadow-2xl transition-all duration-300 overflow-hidden border border-border/20"
                 style={{
                   width: viewportDimensions[viewport].width,
                   height: viewport === "desktop" ? "calc(100vh - 220px)" : viewportDimensions[viewport].height,
@@ -200,6 +228,7 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
                 }}
               >
                 <iframe
+                  key={iframeKey}
                   srcDoc={cleanedHtml}
                   title="Preview"
                   className="w-full h-full border-none"
@@ -210,8 +239,8 @@ export const PreviewPanel = ({ code, isGenerating = false, generationStatus = ""
             </div>
           </div>
         ) : (
-          <div className="h-full p-4">
-            <pre className="glass rounded-xl p-4 overflow-auto text-xs text-foreground/80 h-full font-mono">
+          <div className="h-full p-4 bg-[#0f0f0f]">
+            <pre className="bg-[#1a1a1a] rounded-xl p-4 overflow-auto text-xs text-foreground/80 h-full font-mono border border-border/20">
               <code>{cleanedHtml}</code>
             </pre>
           </div>
@@ -227,12 +256,19 @@ function cleanHtml(code: string): string {
 
   let cleaned = code;
 
-  // Remove thinking tokens
+  // Remove thinking tokens (DeepSeek)
   cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "");
   
   // Remove markdown code fences
   cleaned = cleaned.replace(/```html\s*/gi, "");
+  cleaned = cleaned.replace(/```typescript\s*/gi, "");
+  cleaned = cleaned.replace(/```tsx\s*/gi, "");
+  cleaned = cleaned.replace(/```jsx\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
+  
+  // Remove JSON wrappers
+  cleaned = cleaned.replace(/^\s*\{[\s\S]*?"preview"\s*:\s*"/i, "");
+  cleaned = cleaned.replace(/"\s*\}\s*$/i, "");
   
   cleaned = cleaned.trim();
 

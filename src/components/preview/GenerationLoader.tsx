@@ -1,153 +1,122 @@
 import { useState, useEffect } from "react";
-import { Sparkles, Code2, Palette, Layout, Zap, Check } from "lucide-react";
+import { Sparkles, Code2, Palette, Layout, Zap, Check, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface GenerationLoaderProps {
   status: string;
   isGenerating: boolean;
+  progress?: number;
 }
 
 const steps = [
-  { id: 1, label: "Analyzing request", icon: Sparkles, description: "Understanding your requirements..." },
-  { id: 2, label: "Planning structure", icon: Layout, description: "Designing component architecture..." },
-  { id: 3, label: "Writing components", icon: Code2, description: "Generating React components..." },
-  { id: 4, label: "Styling design", icon: Palette, description: "Applying Tailwind styles..." },
-  { id: 5, label: "Finalizing", icon: Zap, description: "Optimizing and polishing..." },
+  { id: 1, label: "Analyzing request", icon: Sparkles, keywords: ["Analyzing", "Understanding"] },
+  { id: 2, label: "Planning structure", icon: Layout, keywords: ["Planning", "architecture"] },
+  { id: 3, label: "Building components", icon: Code2, keywords: ["Building", "HTML", "React", "component", "Generating"] },
+  { id: 4, label: "Applying styles", icon: Palette, keywords: ["Applying", "Tailwind", "style", "animation"] },
+  { id: 5, label: "Finalizing", icon: Zap, keywords: ["Optimizing", "Finalizing", "complete"] },
 ];
 
-export const GenerationLoader = ({ status, isGenerating }: GenerationLoaderProps) => {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+export const GenerationLoader = ({ status, isGenerating, progress = 0 }: GenerationLoaderProps) => {
+  const [currentStep, setCurrentStep] = useState(1);
 
   useEffect(() => {
     if (!isGenerating) {
-      setCurrentStep(0);
-      setCompletedSteps([]);
+      setCurrentStep(1);
       return;
     }
 
-    if (status.includes("Analyzing")) {
-      setCurrentStep(1);
-    } else if (status.includes("Planning") || status.includes("structure")) {
-      setCurrentStep(2);
-      setCompletedSteps([1]);
-    } else if (status.includes("Writing") || status.includes("component") || status.includes("Streaming")) {
-      setCurrentStep(3);
-      setCompletedSteps([1, 2]);
-    } else if (status.includes("Styling") || status.includes("design")) {
-      setCurrentStep(4);
-      setCompletedSteps([1, 2, 3]);
-    } else if (status.includes("Finalizing") || status.includes("complete")) {
-      setCurrentStep(5);
-      setCompletedSteps([1, 2, 3, 4]);
+    // Determine step from status message
+    for (let i = steps.length - 1; i >= 0; i--) {
+      const step = steps[i];
+      if (step.keywords.some(kw => status.toLowerCase().includes(kw.toLowerCase()))) {
+        setCurrentStep(step.id);
+        break;
+      }
     }
   }, [status, isGenerating]);
 
-  useEffect(() => {
-    if (!isGenerating) return;
-    
-    const interval = setInterval(() => {
-      setCurrentStep(prev => {
-        if (prev < 5) {
-          setCompletedSteps(completed => 
-            prev > 0 && !completed.includes(prev) ? [...completed, prev] : completed
-          );
-          return prev + 1;
-        }
-        return prev;
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [isGenerating]);
-
   return (
-    <div className="h-full flex flex-col items-center justify-center p-8 hero-mesh noise">
+    <div className="h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-background via-background to-muted/20">
       {/* Main Animation */}
-      <div className="relative mb-12">
-        <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20 animate-pulse-glow">
-          <div className="w-16 h-16 rounded-2xl gradient-animated flex items-center justify-center shadow-2xl glow-cyan">
-            <Sparkles className="h-8 w-8 text-white animate-pulse" />
+      <div className="relative mb-10">
+        <div className="w-28 h-28 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary via-purple-500 to-accent flex items-center justify-center shadow-2xl animate-pulse">
+            <Sparkles className="h-10 w-10 text-white" />
           </div>
         </div>
-        {/* Orbiting dots */}
-        <div className="absolute inset-0 animate-spin" style={{ animationDuration: "3s" }}>
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary" />
+        {/* Orbiting elements */}
+        <div className="absolute inset-0 animate-spin" style={{ animationDuration: "4s" }}>
+          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-primary shadow-lg" />
         </div>
-        <div className="absolute inset-0 animate-spin" style={{ animationDuration: "4s", animationDirection: "reverse" }}>
-          <div className="absolute top-1/2 -right-2 -translate-y-1/2 w-2 h-2 rounded-full bg-accent" />
+        <div className="absolute inset-0 animate-spin" style={{ animationDuration: "6s", animationDirection: "reverse" }}>
+          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-accent shadow-lg" />
         </div>
       </div>
 
-      {/* Title */}
-      <h2 className="text-2xl font-bold text-foreground mb-2">Building Your Website</h2>
-      <p className="text-muted-foreground mb-8 text-center max-w-md">
-        Weblitho is crafting your React components with modern design patterns
+      {/* Title & Status */}
+      <h2 className="text-2xl font-display font-bold text-foreground mb-2">Building Your Website</h2>
+      <p className="text-muted-foreground mb-2 text-center max-w-md text-sm">
+        {status || "Preparing AI generation..."}
       </p>
 
+      {/* Progress Bar */}
+      <div className="w-full max-w-md mb-8">
+        <Progress value={progress} className="h-2" />
+        <p className="text-center text-muted-foreground text-xs mt-2">
+          {Math.round(progress)}% complete
+        </p>
+      </div>
+
       {/* Steps */}
-      <div className="w-full max-w-md space-y-3">
+      <div className="w-full max-w-sm space-y-2">
         {steps.map((step) => {
           const Icon = step.icon;
-          const isCompleted = completedSteps.includes(step.id);
-          const isCurrent = currentStep === step.id;
+          const isCompleted = step.id < currentStep;
+          const isCurrent = step.id === currentStep;
           
           return (
             <div
               key={step.id}
-              className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-500 ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                 isCompleted
-                  ? "bg-emerald-500/10 border-emerald-500/30"
+                  ? "bg-emerald-500/10 border border-emerald-500/20"
                   : isCurrent
-                  ? "glass border-primary/30 scale-[1.02]"
-                  : "bg-white/5 border-border/50 opacity-50"
+                  ? "bg-primary/10 border border-primary/20 scale-[1.02]"
+                  : "bg-muted/30 border border-transparent opacity-50"
               }`}
             >
               <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 ${
+                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${
                   isCompleted
                     ? "bg-emerald-500/20"
                     : isCurrent
-                    ? "gradient-animated"
-                    : "bg-white/10"
+                    ? "bg-gradient-to-br from-primary to-purple-500"
+                    : "bg-muted"
                 }`}
               >
                 {isCompleted ? (
-                  <Check className="h-5 w-5 text-emerald-400" />
+                  <Check className="h-4 w-4 text-emerald-400" />
+                ) : isCurrent ? (
+                  <Loader2 className="h-4 w-4 text-white animate-spin" />
                 ) : (
-                  <Icon className={`h-5 w-5 ${isCurrent ? "text-white animate-pulse" : "text-muted-foreground"}`} />
+                  <Icon className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
-              <div className="flex-1">
-                <p className={`font-medium ${isCompleted ? "text-emerald-400" : isCurrent ? "text-foreground" : "text-muted-foreground"}`}>
-                  {step.label}
-                </p>
-                <p className={`text-sm ${isCompleted ? "text-emerald-400/60" : isCurrent ? "text-muted-foreground" : "text-muted-foreground/50"}`}>
-                  {step.description}
-                </p>
-              </div>
+              <span className={`text-sm font-medium ${
+                isCompleted ? "text-emerald-400" : isCurrent ? "text-foreground" : "text-muted-foreground"
+              }`}>
+                {step.label}
+              </span>
               {isCurrent && (
-                <div className="flex gap-1">
+                <div className="ml-auto flex gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               )}
             </div>
           );
         })}
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full max-w-md mt-8">
-        <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className="h-full gradient-animated transition-all duration-500 ease-out"
-            style={{ width: `${(completedSteps.length / steps.length) * 100}%` }}
-          />
-        </div>
-        <p className="text-center text-muted-foreground text-sm mt-2">
-          {Math.round((completedSteps.length / steps.length) * 100)}% complete
-        </p>
       </div>
     </div>
   );

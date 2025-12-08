@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Loader2, Paperclip, X, FileText, RefreshCw, Wand2, Zap } from "lucide-react";
+import { Send, Sparkles, Loader2, Paperclip, X, FileText, RefreshCw, Wand2, Zap, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,7 +16,9 @@ import { ModelType, modelConfig } from "@/components/builder/SettingsDialog";
 interface ChatInterfaceProps {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   onSubmit: (message: string, files?: File[], model?: ModelType) => void;
+  onStop?: () => void;
   isGenerating?: boolean;
+  generationStatus?: string;
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;
 }
@@ -24,7 +26,9 @@ interface ChatInterfaceProps {
 export const ChatInterface = ({ 
   messages, 
   onSubmit, 
+  onStop,
   isGenerating = false,
+  generationStatus = "",
   selectedModel,
   onModelChange 
 }: ChatInterfaceProps) => {
@@ -38,7 +42,7 @@ export const ChatInterface = ({
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isGenerating]);
 
   const handleSubmit = () => {
     if ((input.trim() || files.length > 0) && !isGenerating) {
@@ -86,8 +90,8 @@ export const ChatInterface = ({
       <div className="flex-shrink-0 px-5 py-4 border-b border-border/50 bg-card/80 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl gradient-animated flex items-center justify-center shadow-glow">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
+            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-primary via-purple-500 to-accent flex items-center justify-center shadow-lg">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
               <h3 className="text-sm font-display font-semibold text-foreground">Weblitho AI</h3>
@@ -96,10 +100,12 @@ export const ChatInterface = ({
           </div>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isGenerating ? 'bg-primary' : 'bg-accent'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isGenerating ? 'bg-primary' : 'bg-accent'}`}></span>
             </span>
-            <span className="text-xs font-medium text-accent">Online</span>
+            <span className={`text-xs font-medium ${isGenerating ? 'text-primary' : 'text-accent'}`}>
+              {isGenerating ? 'Generating' : 'Online'}
+            </span>
           </div>
         </div>
       </div>
@@ -121,18 +127,18 @@ export const ChatInterface = ({
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"} animate-slide-up`}
+              className={`flex gap-3 ${message.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
             >
               {message.role === "assistant" && (
-                <div className="flex-shrink-0 w-8 h-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg">
-                  <Sparkles className="h-4 w-4 text-primary-foreground" />
+                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg">
+                  <Sparkles className="h-4 w-4 text-white" />
                 </div>
               )}
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                   message.role === "user"
                     ? "bg-primary text-primary-foreground rounded-br-md"
-                    : "glass border-border/50 text-foreground rounded-bl-md"
+                    : "bg-muted/50 border border-border/50 text-foreground rounded-bl-md"
                 }`}
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
@@ -145,15 +151,22 @@ export const ChatInterface = ({
             </div>
           ))}
 
+          {/* Generation Status */}
           {isGenerating && (
             <div className="flex gap-3 animate-fade-in">
-              <div className="flex-shrink-0 w-8 h-8 rounded-xl gradient-animated flex items-center justify-center shadow-lg">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
+              <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg">
+                <Loader2 className="h-4 w-4 text-white animate-spin" />
               </div>
-              <div className="glass border-border/50 rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%]">
                 <div className="flex items-center gap-3">
-                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  <span className="text-sm text-muted-foreground">Generating...</span>
+                  <span className="text-sm text-foreground font-medium">
+                    {generationStatus || "Generating..."}
+                  </span>
+                </div>
+                <div className="flex gap-1 mt-2">
+                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <div className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <div className="w-2 h-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>
@@ -224,23 +237,30 @@ export const ChatInterface = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder={isGenerating ? "Generating..." : "Describe what to build or modify..."}
             className="min-h-[42px] max-h-[120px] resize-none bg-background border-border/60 focus:border-primary/50 text-sm placeholder:text-muted-foreground/60 rounded-xl"
             disabled={isGenerating}
           />
           
-          <Button 
-            onClick={handleSubmit} 
-            size="icon"
-            className="h-10 w-10 shrink-0 rounded-xl gradient-animated text-primary-foreground shadow-glow"
-            disabled={isGenerating || (!input.trim() && files.length === 0)}
-          >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
+          {isGenerating ? (
+            <Button 
+              onClick={onStop}
+              size="icon"
+              variant="destructive"
+              className="h-10 w-10 shrink-0 rounded-xl"
+            >
+              <Square className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleSubmit} 
+              size="icon"
+              className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-primary to-purple-500 text-white shadow-lg hover:opacity-90"
+              disabled={!input.trim() && files.length === 0}
+            >
               <Send className="h-4 w-4" />
-            )}
-          </Button>
+            </Button>
+          )}
         </div>
       </div>
     </div>

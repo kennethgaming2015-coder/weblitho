@@ -6,7 +6,20 @@ interface StreamingState {
   status: string;
   preview: string;
   error: string | null;
+  progress: number;
+  tokensGenerated: number;
 }
+
+const STATUS_MESSAGES = [
+  { threshold: 0, message: "🔍 Analyzing your request...", progress: 5 },
+  { threshold: 3, message: "📐 Planning component architecture...", progress: 15 },
+  { threshold: 10, message: "🏗️ Generating HTML structure...", progress: 25 },
+  { threshold: 25, message: "⚛️ Building React components...", progress: 40 },
+  { threshold: 50, message: "🎨 Applying Tailwind styles...", progress: 55 },
+  { threshold: 100, message: "✨ Adding animations & effects...", progress: 70 },
+  { threshold: 200, message: "🔧 Optimizing code structure...", progress: 85 },
+  { threshold: 400, message: "🚀 Finalizing your website...", progress: 95 },
+];
 
 export function useStreamingGeneration() {
   const [state, setState] = useState<StreamingState>({
@@ -14,17 +27,20 @@ export function useStreamingGeneration() {
     status: "",
     preview: "",
     error: null,
+    progress: 0,
+    tokensGenerated: 0,
   });
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedTextRef = useRef("");
+  const lastPreviewRef = useRef("");
 
   const stop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    setState(prev => ({ ...prev, isGenerating: false, status: "" }));
+    setState(prev => ({ ...prev, isGenerating: false, status: "Generation cancelled" }));
   }, []);
 
   const generate = useCallback(async ({
@@ -46,7 +62,15 @@ export function useStreamingGeneration() {
   }) => {
     // Reset state
     accumulatedTextRef.current = "";
-    setState({ isGenerating: true, status: "Analyzing your request...", preview: "", error: null });
+    lastPreviewRef.current = "";
+    setState({ 
+      isGenerating: true, 
+      status: "🔍 Analyzing your request...", 
+      preview: "", 
+      error: null,
+      progress: 5,
+      tokensGenerated: 0,
+    });
 
     // Create abort controller
     abortControllerRef.current = new AbortController();
@@ -80,20 +104,22 @@ export function useStreamingGeneration() {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
-          if (response.status === 429) errorMessage = "Rate limit exceeded. Please try again later.";
-          else if (response.status === 402) errorMessage = "Payment required. Please add credits.";
-          else if (response.status === 403) errorMessage = "This model requires a paid plan.";
-          else if (response.status === 401) errorMessage = "Please log in again.";
+          if (response.status === 429) errorMessage = "Rate limit exceeded. Please wait a moment and try again.";
+          else if (response.status === 402) errorMessage = "Insufficient credits. Please add more credits to continue.";
+          else if (response.status === 403) errorMessage = "This model requires a Pro or Business plan. Please upgrade.";
+          else if (response.status === 401) errorMessage = "Session expired. Please refresh and log in again.";
+          else if (response.status >= 500) errorMessage = "AI service temporarily unavailable. Please try again.";
         }
         throw new Error(errorMessage);
       }
 
-      if (!response.body) throw new Error("No response body");
+      if (!response.body) throw new Error("No response body received");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let chunkCount = 0;
+      let lastUpdateTime = Date.now();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -101,7 +127,7 @@ export function useStreamingGeneration() {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process line by line
+        // Process SSE line by line
         let newlineIdx: number;
         while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
           let line = buffer.slice(0, newlineIdx);
@@ -122,57 +148,79 @@ export function useStreamingGeneration() {
               accumulatedTextRef.current += content;
               chunkCount++;
 
-              // Update status based on progress
-              if (chunkCount < 5) {
-                setState(prev => ({ ...prev, status: "Analyzing your request..." }));
-              } else if (chunkCount < 20) {
-                setState(prev => ({ ...prev, status: "Planning component structure..." }));
-              } else if (chunkCount < 50) {
-                setState(prev => ({ ...prev, status: "Writing React components..." }));
-              } else if (chunkCount < 100) {
-                setState(prev => ({ ...prev, status: "Styling with Tailwind CSS..." }));
-              } else {
-                setState(prev => ({ ...prev, status: "Finalizing your website..." }));
+              // Update status based on chunk count
+              const statusConfig = [...STATUS_MESSAGES].reverse().find(s => chunkCount >= s.threshold);
+              if (statusConfig) {
+                setState(prev => ({ 
+                  ...prev, 
+                  status: statusConfig.message,
+                  progress: statusConfig.progress,
+                  tokensGenerated: chunkCount,
+                }));
               }
 
-              // Extract and update preview periodically
-              if (chunkCount % 10 === 0 || chunkCount < 20) {
+              // Throttled preview updates (every 150ms or every 5 chunks for responsiveness)
+              const now = Date.now();
+              if (chunkCount % 5 === 0 || now - lastUpdateTime > 150) {
+                lastUpdateTime = now;
                 const html = extractHtml(accumulatedTextRef.current);
-                if (html) {
+                if (html && html.length > lastPreviewRef.current.length) {
+                  lastPreviewRef.current = html;
                   setState(prev => ({ ...prev, preview: html }));
                   onChunk?.(html);
                 }
               }
             }
           } catch {
-            // Skip malformed JSON, put line back in buffer
+            // Malformed JSON - put back in buffer and wait for more data
             buffer = line + "\n" + buffer;
             break;
           }
         }
       }
 
-      // Final extraction
+      // Final extraction with complete HTML
       const finalHtml = extractHtml(accumulatedTextRef.current);
       
-      if (finalHtml) {
-        setState(prev => ({ ...prev, preview: finalHtml, status: "Generation complete!" }));
+      if (finalHtml && finalHtml.includes("</html>")) {
+        setState(prev => ({ 
+          ...prev, 
+          preview: finalHtml, 
+          status: "✅ Generation complete!",
+          progress: 100,
+        }));
         onComplete?.(finalHtml);
+      } else if (finalHtml) {
+        // Partial HTML - try to complete it
+        const completedHtml = completeHtml(finalHtml);
+        setState(prev => ({ 
+          ...prev, 
+          preview: completedHtml, 
+          status: "✅ Generation complete!",
+          progress: 100,
+        }));
+        onComplete?.(completedHtml);
       } else {
-        // Fallback: use raw output
-        const fallback = accumulatedTextRef.current.trim();
-        setState(prev => ({ ...prev, preview: fallback, status: "Generation complete!" }));
-        onComplete?.(fallback);
+        // Fallback: use raw accumulated text
+        const rawContent = accumulatedTextRef.current.trim();
+        const wrappedHtml = wrapInHtml(rawContent);
+        setState(prev => ({ 
+          ...prev, 
+          preview: wrappedHtml, 
+          status: "✅ Generation complete!",
+          progress: 100,
+        }));
+        onComplete?.(wrappedHtml);
       }
 
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        console.log("Generation aborted");
+        console.log("Generation aborted by user");
         return;
       }
 
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setState(prev => ({ ...prev, error: errorMsg, status: "" }));
+      const errorMsg = err instanceof Error ? err.message : "An unexpected error occurred";
+      setState(prev => ({ ...prev, error: errorMsg, status: "❌ Generation failed", progress: 0 }));
       onError?.(errorMsg);
     } finally {
       setState(prev => ({ ...prev, isGenerating: false }));
@@ -187,38 +235,78 @@ export function useStreamingGeneration() {
   };
 }
 
-// Extract clean HTML from AI output
+// Extract and clean HTML from AI output
 function extractHtml(text: string): string {
   if (!text) return "";
 
   let cleaned = text;
 
-  // Remove thinking tokens
+  // Remove thinking tokens (DeepSeek)
   cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "");
   
   // Remove markdown code fences
   cleaned = cleaned.replace(/```html\s*/gi, "");
+  cleaned = cleaned.replace(/```typescript\s*/gi, "");
+  cleaned = cleaned.replace(/```tsx\s*/gi, "");
+  cleaned = cleaned.replace(/```jsx\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
+  
+  // Remove JSON wrappers if present
+  cleaned = cleaned.replace(/^\s*\{[\s\S]*?"preview"\s*:\s*"/i, "");
+  cleaned = cleaned.replace(/"\s*\}\s*$/i, "");
   
   cleaned = cleaned.trim();
 
   // Extract complete HTML document
   const docMatch = cleaned.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-  if (docMatch) return docMatch[0];
+  if (docMatch) return docMatch[0].trim();
 
   // Try without DOCTYPE
   const htmlMatch = cleaned.match(/<html[\s\S]*<\/html>/i);
-  if (htmlMatch) return "<!DOCTYPE html>\n" + htmlMatch[0];
+  if (htmlMatch) return "<!DOCTYPE html>\n" + htmlMatch[0].trim();
 
-  // Return partial HTML for streaming preview
-  const partialMatch = cleaned.match(/<!DOCTYPE html>[\s\S]*/i);
-  if (partialMatch) {
-    let partial = partialMatch[0];
-    // Add closing tags if missing
-    if (!partial.includes("</body>")) partial += "\n</body>";
-    if (!partial.includes("</html>")) partial += "\n</html>";
-    return partial;
+  // Return partial HTML for streaming (from DOCTYPE onwards)
+  const partialIdx = cleaned.indexOf("<!DOCTYPE html>");
+  if (partialIdx !== -1) {
+    return cleaned.slice(partialIdx);
+  }
+
+  // Try from <html> tag
+  const htmlIdx = cleaned.indexOf("<html");
+  if (htmlIdx !== -1) {
+    return "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx);
   }
 
   return "";
+}
+
+// Complete partial HTML with closing tags
+function completeHtml(html: string): string {
+  let completed = html;
+  
+  // Add missing closing tags
+  if (!completed.includes("</body>")) {
+    completed += "\n</body>";
+  }
+  if (!completed.includes("</html>")) {
+    completed += "\n</html>";
+  }
+  
+  return completed;
+}
+
+// Wrap raw content in basic HTML structure
+function wrapInHtml(content: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generated Page</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+  ${content}
+</body>
+</html>`;
 }

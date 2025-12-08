@@ -586,37 +586,12 @@ const Index = () => {
             <ChatInterface
               messages={messages}
               onSubmit={handleMessageSubmit}
+              onStop={handleStop}
               isGenerating={streaming.isGenerating}
+              generationStatus={streaming.status}
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
             />
-            
-            {/* Generation Status */}
-            {streaming.isGenerating && streaming.status && (
-              <div className="px-4 py-3 border-t border-border/50 bg-primary/5 backdrop-blur-xl animate-fade-in">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
-                    <div className="absolute inset-0 h-2.5 w-2.5 rounded-full bg-primary animate-ping" />
-                  </div>
-                  <span className="text-sm text-foreground/80 font-medium">{streaming.status}</span>
-                </div>
-              </div>
-            )}
-            
-            {/* Stop Button */}
-            {streaming.isGenerating && (
-              <div className="px-4 py-3 border-t border-border/50 bg-card/50 animate-fade-in">
-                <Button 
-                  onClick={handleStop}
-                  variant="destructive"
-                  className="w-full"
-                  size="sm"
-                >
-                  Stop Generating
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Pages Panel - Side Panel */}
@@ -707,6 +682,7 @@ const Index = () => {
                     code={generatedContent?.preview || streaming.preview}
                     isGenerating={streaming.isGenerating}
                     generationStatus={streaming.status}
+                    generationProgress={streaming.progress}
                     validation={null}
                   />
                 </div>
