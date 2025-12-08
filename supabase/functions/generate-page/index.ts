@@ -27,7 +27,15 @@ serve(async (req) => {
 
     console.log("=== GENERATE-PAGE START ===");
     console.log("Model requested:", model);
+    console.log("Prompt length:", prompt?.length);
     console.log("Has current code:", !!currentCode);
+
+    if (!prompt || typeof prompt !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Prompt is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const modelConfig = MODEL_MAPPING[model] || MODEL_MAPPING["deepseek-free"];
     
@@ -92,7 +100,7 @@ serve(async (req) => {
 
       const messages = [
         { role: "system", content: systemPrompt },
-        ...conversationHistory,
+        ...conversationHistory.slice(-6), // Keep last 6 messages for context
         { role: "user", content: prompt }
       ];
 
@@ -109,27 +117,36 @@ serve(async (req) => {
           messages,
           stream: true,
           max_tokens: 16000,
+          temperature: 0.7,
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("OpenRouter error:", response.status, errorText);
+        
+        if (response.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "AI service is busy. Please try again in a moment." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
         return new Response(
-          JSON.stringify({ error: "AI gateway error", details: errorText }),
+          JSON.stringify({ error: "AI generation failed. Please try again." }),
           { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       console.log("OpenRouter streaming started");
       
-      // Pass through OpenRouter stream directly (already OpenAI-compatible)
       return new Response(response.body, {
         headers: { 
           ...corsHeaders, 
           "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive"
+          "Cache-Control": "no-cache, no-transform",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no"
         },
       });
 
@@ -141,7 +158,8 @@ serve(async (req) => {
       }
 
       const contents = [];
-      for (const msg of conversationHistory) {
+      const recentHistory = conversationHistory.slice(-6);
+      for (const msg of recentHistory) {
         contents.push({
           role: msg.role === "assistant" ? "model" : "user",
           parts: [{ text: msg.content }]
@@ -154,7 +172,7 @@ serve(async (req) => {
 
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.model}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
 
-      console.log("Calling Gemini:", geminiUrl.replace(GEMINI_API_KEY, "***"));
+      console.log("Calling Gemini:", modelConfig.model);
 
       const response = await fetch(geminiUrl, {
         method: "POST",
@@ -165,6 +183,7 @@ serve(async (req) => {
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 65536,
+            topP: 0.95,
           }
         }),
       });
@@ -172,8 +191,16 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Gemini API error:", response.status, errorText);
+        
+        if (response.status === 429) {
+          return new Response(
+            JSON.stringify({ error: "AI service is busy. Please try again in a moment." }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
         return new Response(
-          JSON.stringify({ error: "AI gateway error", details: errorText }),
+          JSON.stringify({ error: "AI generation failed. Please try again." }),
           { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -192,7 +219,6 @@ serve(async (req) => {
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
-                // Send final DONE event
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                 controller.close();
                 console.log("Gemini stream completed");
@@ -214,7 +240,6 @@ serve(async (req) => {
                   const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
                   
                   if (text) {
-                    // Convert to OpenAI format
                     const openAIFormat = {
                       choices: [{
                         delta: { content: text },
@@ -224,7 +249,7 @@ serve(async (req) => {
                     };
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`));
                   }
-                } catch (parseErr) {
+                } catch {
                   // Skip malformed JSON
                 }
               }
@@ -240,8 +265,9 @@ serve(async (req) => {
         headers: { 
           ...corsHeaders, 
           "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive"
+          "Cache-Control": "no-cache, no-transform",
+          "Connection": "keep-alive",
+          "X-Accel-Buffering": "no"
         },
       });
     }
@@ -249,47 +275,54 @@ serve(async (req) => {
   } catch (e) {
     console.error("Generate-page error:", e);
     return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      JSON.stringify({ error: e instanceof Error ? e.message : "Generation failed. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
 // ===========================================
-// GENERATION PROMPT
+// GENERATION PROMPT - Enhanced for better output
 // ===========================================
 function buildGenerationPrompt(): string {
-  return `You are Weblitho, a premium AI website builder.
+  return `You are Weblitho, a world-class AI website builder that creates stunning, production-ready websites.
 
-CRITICAL OUTPUT RULES:
-- Output ONLY a complete HTML document
-- Start with: <!DOCTYPE html>
-- End with: </html>
-- NO markdown code fences
-- NO JSON wrapper
-- NO explanations before or after
+## OUTPUT FORMAT - CRITICAL
+- Output ONLY valid HTML starting with <!DOCTYPE html>
+- End with </html>
+- NO markdown code blocks (no \`\`\`)
+- NO JSON wrappers
+- NO explanations or text before/after
 - PURE HTML ONLY
 
-TEMPLATE:
+## HTML TEMPLATE
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Page Title</title>
+  <title>Website Title</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
           animation: {
-            'fade-in': 'fadeIn 0.6s ease-out',
-            'slide-up': 'slideUp 0.6s ease-out',
+            'fade-in': 'fadeIn 0.5s ease-out',
+            'slide-up': 'slideUp 0.5s ease-out',
+            'slide-down': 'slideDown 0.3s ease-out',
+            'scale-in': 'scaleIn 0.3s ease-out',
             'float': 'float 3s ease-in-out infinite',
+            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'bounce-slow': 'bounce 2s infinite',
           },
           keyframes: {
             fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
             slideUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            slideDown: { '0%': { opacity: '0', transform: 'translateY(-10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
             float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
           }
         }
@@ -297,60 +330,78 @@ TEMPLATE:
     }
   </script>
   <style>
-    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); }
-    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+    .glass-dark { background: rgba(0,0,0,0.3); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
+    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .gradient-bg { background: linear-gradient(135deg, #06b6d4, #8b5cf6); }
     .glow { box-shadow: 0 0 40px rgba(6, 182, 212, 0.3); }
+    .glow-purple { box-shadow: 0 0 40px rgba(139, 92, 246, 0.3); }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+    .btn-glow { transition: all 0.3s ease; }
+    .btn-glow:hover { box-shadow: 0 0 20px rgba(6, 182, 212, 0.5); transform: translateY(-2px); }
   </style>
 </head>
-<body class="antialiased bg-gray-950 text-white min-h-screen">
-  <!-- Website content -->
+<body class="antialiased bg-gray-950 text-white min-h-screen font-sans">
+  <!-- Content here -->
 </body>
 </html>
 
-DESIGN REQUIREMENTS:
-- Premium modern design like Vercel, Stripe, Linear
-- Large hero headlines (text-5xl to text-7xl)
-- Generous section spacing (py-20 to py-32)
-- max-w-7xl mx-auto containers
-- Soft gradients (cyan, purple, blue)
-- rounded-2xl components
-- Smooth hover transitions
-- Dark theme: gray-950 base
-- Glass morphism effects
-- Fully responsive
+## DESIGN SYSTEM - FOLLOW EXACTLY
+- **Colors**: gray-950 (bg), gray-900 (cards), cyan-500/purple-500 (accents)
+- **Typography**: text-5xl to text-7xl heroes, text-xl subtitles, text-base body
+- **Spacing**: py-20 to py-32 sections, gap-8 grids
+- **Borders**: rounded-2xl to rounded-3xl, border-gray-800
+- **Effects**: Glass morphism, soft gradients, subtle shadows
+- **Layout**: max-w-7xl mx-auto px-6
 
-REQUIRED SECTIONS:
-1. Sticky navbar with glass effect
-2. Hero with gradient headline, subtext, 2 CTA buttons
-3. Features in bento grid layout
-4. CTA section with gradient background
-5. Footer with columns
+## REQUIRED SECTIONS (in order)
+1. **Navbar**: Sticky, glass effect, logo left, nav links center, CTA button right
+2. **Hero**: Gradient headline, compelling subtext, 2 CTA buttons, optional visual
+3. **Features**: Bento grid or 3-4 column layout with icons
+4. **Social Proof**: Stats, logos, or testimonials
+5. **CTA Section**: Gradient background, compelling offer
+6. **Footer**: Multi-column with links, social icons, copyright
 
-USE INLINE SVG ICONS - Examples:
+## SVG ICONS - Use inline SVGs
 Arrow: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+Check: <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+Star: <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
 
-Generate beautiful, complete HTML now.`;
+## QUALITY REQUIREMENTS
+- Fully responsive (mobile-first)
+- Semantic HTML (header, main, section, footer)
+- Accessible (proper contrast, alt text placeholder)
+- Interactive (hover states, transitions)
+- Complete and polished (no Lorem ipsum unless specifically a placeholder site)
+- Professional copywriting that matches the purpose
+
+Generate a beautiful, complete website now.`;
 }
 
 // ===========================================
-// MODIFICATION PROMPT
+// MODIFICATION PROMPT - Better for edits
 // ===========================================
 function buildModificationPrompt(currentCode: string): string {
   return `You are Weblitho, modifying an existing website.
 
-OUTPUT: Return ONLY the complete modified HTML document.
+## OUTPUT FORMAT - CRITICAL
+- Return ONLY the complete modified HTML
 - Start with: <!DOCTYPE html>
 - End with: </html>
-- NO markdown, NO JSON, NO explanations
+- NO markdown code blocks
+- NO JSON wrappers
+- NO explanations
 
-CURRENT WEBSITE CODE:
+## CURRENT WEBSITE
 ${currentCode}
 
-RULES:
+## MODIFICATION RULES
 1. Make ONLY the requested changes
-2. PRESERVE everything else exactly
-3. Keep all Tailwind CDN and custom styles
-4. Return the COMPLETE modified HTML
+2. PRESERVE all existing structure, styles, and functionality
+3. Keep Tailwind CDN, fonts, and custom CSS intact
+4. Maintain design consistency
+5. Return the COMPLETE modified HTML document
 
-Return the modified HTML now.`;
+Make the requested changes and return the full HTML now.`;
 }

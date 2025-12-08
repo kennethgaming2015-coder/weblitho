@@ -589,6 +589,7 @@ const Index = () => {
               onStop={handleStop}
               isGenerating={streaming.isGenerating}
               generationStatus={streaming.status}
+              generationProgress={streaming.progress}
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
             />
