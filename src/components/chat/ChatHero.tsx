@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Send, Paperclip, FileText, X, Wand2, Globe, Layout, Box, Database, ArrowRight, Lock, Sparkles } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Send, Paperclip, FileText, X, Wand2, Globe, Layout, Box, Database, ArrowRight, Lock, Sparkles, Zap, Code, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -33,7 +33,13 @@ export const ChatHero = ({
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+
+  // Focus textarea on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   const handleSubmit = () => {
     if ((input.trim() || files.length > 0) && !isGenerating) {
@@ -67,32 +73,68 @@ export const ChatHero = ({
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Quick start templates
   const templates = [
-    { icon: Globe, title: "Landing Page", desc: "SaaS & Startups", prompt: "Create a modern SaaS landing page with hero, features grid, pricing, and footer. Use glassmorphism and smooth animations.", gradient: "from-primary to-purple-500" },
-    { icon: Layout, title: "Dashboard", desc: "Analytics & Admin", prompt: "Build an admin dashboard with sidebar, stats cards, charts, and data tables. Modern dark theme.", gradient: "from-accent to-teal-400" },
-    { icon: Box, title: "Portfolio", desc: "Creative Work", prompt: "Design a creative portfolio with project gallery, about section, and contact form. Minimalist style.", gradient: "from-pink-500 to-rose-500" },
-    { icon: Database, title: "E-commerce", desc: "Product Pages", prompt: "Create an e-commerce product page with image gallery, cart, reviews, and related products.", gradient: "from-amber-500 to-orange-500" },
+    { 
+      icon: Globe, 
+      title: "SaaS Landing", 
+      desc: "Product launch page", 
+      prompt: "Create a modern SaaS landing page for a productivity app. Include a hero with gradient headline and product mockup, features in a bento grid layout, pricing table with 3 tiers, customer testimonials carousel, FAQ accordion, and a footer with newsletter signup. Use a dark theme with cyan and purple accents.",
+      gradient: "from-primary to-purple-500" 
+    },
+    { 
+      icon: Layout, 
+      title: "Dashboard", 
+      desc: "Admin interface", 
+      prompt: "Build a modern admin dashboard with a collapsible sidebar, top navbar with search and notifications, stats cards with charts, recent activity list, and a data table with sorting. Include a dark/light mode toggle and use a professional dark theme.",
+      gradient: "from-accent to-teal-400" 
+    },
+    { 
+      icon: Box, 
+      title: "Portfolio", 
+      desc: "Creative showcase", 
+      prompt: "Design an elegant portfolio website for a designer. Include a hero with animated text, project gallery with hover effects showing project details, about section with skills, testimonials from clients, and a contact form. Use minimalist design with subtle animations.",
+      gradient: "from-pink-500 to-rose-500" 
+    },
+    { 
+      icon: Database, 
+      title: "E-commerce", 
+      desc: "Product store", 
+      prompt: "Create an e-commerce product page with a large image gallery, product details section, size/color selectors, add to cart button with animations, customer reviews with ratings, related products carousel, and trust badges. Modern dark theme with orange accents.",
+      gradient: "from-amber-500 to-orange-500" 
+    },
   ];
 
   const useTemplate = (template: typeof templates[0]) => {
     setInput(template.prompt);
-    toast({ title: "Template loaded", description: `${template.title} ready to customize` });
+    toast({ title: "Template loaded", description: `${template.title} template ready` });
+    textareaRef.current?.focus();
   };
 
   const handleTemplateSelect = (prompt: string) => {
     setInput(prompt);
-    toast({ title: "Template loaded", description: "Ready to customize" });
+    toast({ title: "Template loaded", description: "Ready to generate" });
+    textareaRef.current?.focus();
   };
 
   const handleInsertImage = (url: string) => {
-    setInput(prev => prev + (prev ? '\n\n' : '') + `Use this image: ${url}`);
+    setInput(prev => prev + (prev ? '\n\n' : '') + `Include this image in the design: ${url}`);
+    textareaRef.current?.focus();
   };
 
   const currentModel = modelConfig[selectedModel] || modelConfig["deepseek-free"];
 
+  // Example prompts for inspiration
+  const examplePrompts = [
+    "A fintech landing page with animated stats counters",
+    "A restaurant website with menu and reservations",
+    "A startup landing page with team section",
+    "A personal blog with article cards",
+  ];
+
   return (
     <div className="relative min-h-screen hero-mesh noise overflow-hidden">
-      {/* Decorative Elements */}
+      {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-32 left-[10%] w-[600px] h-[600px] bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-[120px] animate-float" />
         <div className="absolute bottom-20 right-[5%] w-[500px] h-[500px] bg-gradient-to-br from-accent/8 to-transparent rounded-full blur-[100px] animate-float-slow delay-300" />
@@ -117,18 +159,17 @@ export const ChatHero = ({
           {/* Title */}
           <div className="text-center space-y-6 animate-slide-up delay-100">
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-foreground leading-[1.1] tracking-tight text-balance">
-              Build with{" "}
-              <span className="gradient-text">Weblitho</span>
+              Build websites{" "}
+              <span className="gradient-text">instantly</span>
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto font-light leading-relaxed">
-              Create stunning websites in seconds. 
-              <span className="text-foreground font-medium"> Just describe what you want.</span>
+              Describe what you want in plain language.
+              <span className="text-foreground font-medium"> Get production-ready code in seconds.</span>
             </p>
           </div>
 
-          {/* Quick Templates + Buttons Row */}
+          {/* Quick Templates */}
           <div className="flex flex-col lg:flex-row items-stretch gap-4 animate-slide-up delay-200">
-            {/* Quick template cards */}
             <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-3">
               {templates.map((t, i) => (
                 <Card
@@ -145,24 +186,24 @@ export const ChatHero = ({
               ))}
             </div>
             
-            {/* Action Buttons */}
+            {/* Gallery & Upload */}
             <div className="flex flex-row lg:flex-col gap-2 lg:w-auto">
               <TemplateGallery onSelectTemplate={handleTemplateSelect} />
               <ImageUploadPanel onInsertImage={handleInsertImage} />
             </div>
           </div>
 
-          {/* Main Input */}
+          {/* Main Input Card */}
           <div className="animate-scale-in delay-300">
             <div className="glass-strong rounded-3xl overflow-hidden shadow-soft-lg">
-              {/* Model Bar */}
+              {/* Model Selector Bar */}
               <div className="px-6 py-4 border-b border-border/50 flex items-center justify-between bg-muted/30">
                 <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-xl bg-primary/10">
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20">
                     <Wand2 className="h-4 w-4 text-primary" />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Model:</span>
+                    <span className="text-sm text-muted-foreground hidden sm:inline">Model:</span>
                     <Select 
                       value={selectedModel} 
                       onValueChange={(v) => {
@@ -178,7 +219,7 @@ export const ChatHero = ({
                         onModelChange(modelId);
                       }}
                     >
-                      <SelectTrigger className="h-9 w-[200px] bg-background/80 border-border/60 text-sm font-medium rounded-xl">
+                      <SelectTrigger className="h-9 w-[180px] bg-background/80 border-border/60 text-sm font-medium rounded-xl">
                         <SelectValue>{currentModel.name}</SelectValue>
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
@@ -209,11 +250,11 @@ export const ChatHero = ({
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 text-xs font-medium text-accent">
                   <Sparkles className="h-3.5 w-3.5" />
-                  Validator Active
+                  <span className="hidden sm:inline">Auto-Validation</span>
                 </div>
               </div>
 
-              {/* Files */}
+              {/* File Attachments */}
               {files.length > 0 && (
                 <div className="px-6 py-3 border-b border-border/50 flex flex-wrap gap-2 bg-muted/20">
                   {files.map((file, i) => (
@@ -231,13 +272,30 @@ export const ChatHero = ({
               {/* Textarea */}
               <div className="p-6">
                 <Textarea
+                  ref={textareaRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Describe your website in detail... Be specific about design, colors, sections, and features."
-                  className="min-h-[160px] resize-none bg-transparent border-none text-foreground text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 font-sans"
+                  placeholder="Describe your website in detail... Include sections, features, colors, and style preferences."
+                  className="min-h-[140px] resize-none bg-transparent border-none text-foreground text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 font-sans"
                   disabled={isGenerating}
                 />
+                
+                {/* Example prompts */}
+                {!input && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="text-xs text-muted-foreground">Try:</span>
+                    {examplePrompts.slice(0, 3).map((prompt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setInput(prompt)}
+                        className="text-xs text-primary hover:text-primary/80 underline-offset-2 hover:underline transition-colors"
+                      >
+                        "{prompt.slice(0, 35)}..."
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -249,6 +307,7 @@ export const ChatHero = ({
                     multiple
                     onChange={handleFileSelect}
                     className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.txt"
                   />
                   <Button
                     variant="ghost"
@@ -264,9 +323,9 @@ export const ChatHero = ({
                 <Button
                   onClick={handleSubmit}
                   disabled={isGenerating || (!input.trim() && files.length === 0)}
-                  className="gradient-animated text-primary-foreground font-semibold px-8 py-5 rounded-2xl shadow-glow group text-base"
+                  className="bg-gradient-to-r from-primary to-purple-500 text-white font-semibold px-8 py-5 rounded-2xl shadow-lg hover:shadow-xl hover:opacity-90 transition-all group text-base"
                 >
-                  <Send className="h-4 w-4 mr-2" />
+                  <Zap className="h-4 w-4 mr-2" />
                   Generate
                   <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
@@ -274,11 +333,11 @@ export const ChatHero = ({
             </div>
           </div>
 
-          {/* Tips */}
+          {/* Bottom Tips */}
           <div className="text-center animate-fade-in delay-500">
             <p className="text-sm text-muted-foreground inline-flex items-center gap-2">
               <span className="text-lg">💡</span>
-              Be specific about colors, layout, animations, and features for best results
+              The more detail you provide, the better the result. Include colors, layout, and specific features.
             </p>
           </div>
         </div>

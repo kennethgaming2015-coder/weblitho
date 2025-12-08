@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Loader2, Paperclip, X, FileText, RefreshCw, Wand2, Zap, Square } from "lucide-react";
+import { Send, Sparkles, Loader2, Paperclip, X, FileText, RefreshCw, Wand2, Zap, Square, MessageSquare, Code, Palette, Layout } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ interface ChatInterfaceProps {
   onStop?: () => void;
   isGenerating?: boolean;
   generationStatus?: string;
+  generationProgress?: number;
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;
 }
@@ -29,6 +31,7 @@ export const ChatInterface = ({
   onStop,
   isGenerating = false,
   generationStatus = "",
+  generationProgress = 0,
   selectedModel,
   onModelChange 
 }: ChatInterfaceProps) => {
@@ -36,13 +39,20 @@ export const ChatInterface = ({
   const [files, setFiles] = useState<File[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isGenerating]);
+  }, [messages, isGenerating, generationStatus]);
+
+  // Focus textarea on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   const handleSubmit = () => {
     if ((input.trim() || files.length > 0) && !isGenerating) {
@@ -76,10 +86,19 @@ export const ChatInterface = ({
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Quick modification actions
   const quickActions = [
-    { icon: RefreshCw, label: "Improve design", prompt: "Enhance the design with better spacing, colors, and visual hierarchy" },
-    { icon: Wand2, label: "Add animations", prompt: "Add smooth micro-interactions and animations throughout" },
-    { icon: Zap, label: "More sections", prompt: "Add more content sections like testimonials or FAQ" },
+    { icon: RefreshCw, label: "Improve design", prompt: "Improve the design with better visual hierarchy, spacing, and modern aesthetics. Make it look more premium and polished." },
+    { icon: Wand2, label: "Add animations", prompt: "Add smooth animations and micro-interactions throughout the website. Include hover effects, scroll animations, and transitions." },
+    { icon: Palette, label: "Change colors", prompt: "Update the color scheme to be more vibrant and modern while maintaining readability and contrast." },
+    { icon: Layout, label: "Add section", prompt: "Add a new section with testimonials or customer reviews. Include photos, names, and compelling quotes." },
+  ];
+
+  // Prompt suggestions for empty state
+  const promptSuggestions = [
+    { icon: Code, title: "SaaS Landing", prompt: "Create a modern SaaS landing page for a project management tool. Include hero with product mockup, features grid, pricing table, testimonials, and footer." },
+    { icon: Layout, title: "Portfolio", prompt: "Design a creative portfolio website for a designer. Include hero with intro, project gallery with hover effects, about section, and contact form." },
+    { icon: Sparkles, title: "Agency", prompt: "Build a digital agency website with bold typography, case studies section, team grid, services list, and contact CTA." },
   ];
 
   const currentModel = modelConfig[selectedModel];
@@ -98,14 +117,22 @@ export const ChatInterface = ({
               <p className="text-xs text-muted-foreground">{currentModel?.name || "AI Assistant"}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10">
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isGenerating ? 'bg-primary' : 'bg-accent'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${isGenerating ? 'bg-primary' : 'bg-accent'}`}></span>
-            </span>
-            <span className={`text-xs font-medium ${isGenerating ? 'text-primary' : 'text-accent'}`}>
-              {isGenerating ? 'Generating' : 'Online'}
-            </span>
+          <div className="flex items-center gap-2">
+            {isGenerating && (
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 animate-pulse">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                {Math.round(generationProgress)}%
+              </Badge>
+            )}
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${isGenerating ? 'bg-primary/10' : 'bg-accent/10'}`}>
+              <span className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isGenerating ? 'bg-primary' : 'bg-accent'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isGenerating ? 'bg-primary' : 'bg-accent'}`}></span>
+              </span>
+              <span className={`text-xs font-medium ${isGenerating ? 'text-primary' : 'text-accent'}`}>
+                {isGenerating ? 'Building' : 'Ready'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -113,17 +140,44 @@ export const ChatInterface = ({
       {/* Messages */}
       <ScrollArea className="flex-1 px-5" ref={scrollRef}>
         <div className="py-5 space-y-5">
-          {messages.length === 0 && (
-            <div className="text-center py-10 animate-fade-in">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-5">
-                <Sparkles className="h-7 w-7 text-primary" />
+          {/* Empty State with Suggestions */}
+          {messages.length === 0 && !isGenerating && (
+            <div className="py-8 animate-fade-in">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 mb-4">
+                  <MessageSquare className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">What would you like to build?</h3>
+                <p className="text-sm text-muted-foreground">Describe your website in detail or try a suggestion below</p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Start a conversation to build something amazing
-              </p>
+              
+              <div className="space-y-3">
+                {promptSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setInput(suggestion.prompt)}
+                    className="w-full p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 hover:border-primary/30 transition-all text-left group"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                        <suggestion.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm text-foreground group-hover:text-primary transition-colors">
+                          {suggestion.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {suggestion.prompt.slice(0, 80)}...
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           
+          {/* Message List */}
           {messages.map((message, index) => (
             <div
               key={index}
@@ -151,32 +205,38 @@ export const ChatInterface = ({
             </div>
           ))}
 
-          {/* Generation Status */}
+          {/* Generation Status with Progress */}
           {isGenerating && (
             <div className="flex gap-3 animate-fade-in">
               <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg">
                 <Loader2 className="h-4 w-4 text-white animate-spin" />
               </div>
               <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%]">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-foreground font-medium">
                     {generationStatus || "Generating..."}
                   </span>
                 </div>
-                <div className="flex gap-1 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-2 h-2 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="w-full bg-muted rounded-full h-1.5 mb-2">
+                  <div 
+                    className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${generationProgress}%` }}
+                  />
+                </div>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - Show when there are messages and not generating */}
         {messages.length > 0 && !isGenerating && (
           <div className="pb-5 animate-fade-in">
-            <p className="text-xs text-muted-foreground mb-2 font-medium">Quick actions</p>
+            <p className="text-xs text-muted-foreground mb-2 font-medium">Quick modifications</p>
             <div className="flex flex-wrap gap-2">
               {quickActions.map((action, index) => (
                 <Button
@@ -197,6 +257,7 @@ export const ChatInterface = ({
 
       {/* Input Area */}
       <div className="flex-shrink-0 p-5 border-t border-border/50 bg-card/80 backdrop-blur-xl">
+        {/* File Attachments */}
         {files.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">
             {files.map((file, index) => (
@@ -221,6 +282,7 @@ export const ChatInterface = ({
             multiple
             onChange={handleFileSelect}
             className="hidden"
+            accept="image/*,.pdf,.doc,.docx,.txt"
           />
           
           <Button
@@ -234,11 +296,12 @@ export const ChatInterface = ({
           </Button>
           
           <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isGenerating ? "Generating..." : "Describe what to build or modify..."}
-            className="min-h-[42px] max-h-[120px] resize-none bg-background border-border/60 focus:border-primary/50 text-sm placeholder:text-muted-foreground/60 rounded-xl"
+            placeholder={isGenerating ? "Generating your website..." : "Describe your website in detail..."}
+            className="min-h-[44px] max-h-[160px] resize-none bg-background border-border/60 focus:border-primary/50 text-sm placeholder:text-muted-foreground/60 rounded-xl"
             disabled={isGenerating}
           />
           
@@ -248,6 +311,7 @@ export const ChatInterface = ({
               size="icon"
               variant="destructive"
               className="h-10 w-10 shrink-0 rounded-xl"
+              title="Stop generation"
             >
               <Square className="h-4 w-4" />
             </Button>
@@ -255,13 +319,20 @@ export const ChatInterface = ({
             <Button 
               onClick={handleSubmit} 
               size="icon"
-              className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-primary to-purple-500 text-white shadow-lg hover:opacity-90"
+              className="h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br from-primary to-purple-500 text-white shadow-lg hover:opacity-90 transition-opacity"
               disabled={!input.trim() && files.length === 0}
             >
               <Send className="h-4 w-4" />
             </Button>
           )}
         </div>
+        
+        {/* Keyboard hint */}
+        {!isGenerating && input.trim() && (
+          <p className="text-[10px] text-muted-foreground mt-2 text-center">
+            Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">Enter</kbd> to send
+          </p>
+        )}
       </div>
     </div>
   );
