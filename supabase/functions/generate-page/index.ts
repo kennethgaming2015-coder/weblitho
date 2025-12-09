@@ -6,11 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Model mapping with capabilities
+// Model mapping with capabilities - using stable model names
 const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string; requiresPaid: boolean; maxTokens: number }> = {
   "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false, maxTokens: 16000 },
-  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash-preview-05-20", requiresPaid: true, maxTokens: 65536 },
-  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro-preview-05-06", requiresPaid: true, maxTokens: 65536 },
+  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash", requiresPaid: true, maxTokens: 65536 },
+  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro", requiresPaid: true, maxTokens: 65536 },
 };
 
 const isPaidPlan = (plan: string): boolean => plan === 'pro' || plan === 'business' || plan === 'owner';
