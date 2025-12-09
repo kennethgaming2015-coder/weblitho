@@ -4,27 +4,35 @@ import { supabase } from "@/integrations/supabase/client";
 interface StreamingState {
   isGenerating: boolean;
   status: string;
+  statusType: "analyzing" | "planning" | "building" | "styling" | "finalizing" | "complete" | "error";
   preview: string;
   error: string | null;
   progress: number;
   tokensGenerated: number;
 }
 
-const STATUS_MESSAGES = [
-  { threshold: 0, message: "🔍 Analyzing your request...", progress: 5 },
-  { threshold: 3, message: "📐 Planning component architecture...", progress: 15 },
-  { threshold: 10, message: "🏗️ Generating HTML structure...", progress: 25 },
-  { threshold: 25, message: "⚛️ Building React components...", progress: 40 },
-  { threshold: 50, message: "🎨 Applying Tailwind styles...", progress: 55 },
-  { threshold: 100, message: "✨ Adding animations & effects...", progress: 70 },
-  { threshold: 200, message: "🔧 Optimizing code structure...", progress: 85 },
-  { threshold: 400, message: "🚀 Finalizing your website...", progress: 95 },
+// Detailed status messages with timing
+const STATUS_PHASES = [
+  { threshold: 0, status: "Analyzing your request...", type: "analyzing" as const, progress: 5 },
+  { threshold: 2, status: "Understanding requirements...", type: "analyzing" as const, progress: 10 },
+  { threshold: 5, status: "Planning website structure...", type: "planning" as const, progress: 15 },
+  { threshold: 10, status: "Designing component architecture...", type: "planning" as const, progress: 20 },
+  { threshold: 20, status: "Generating HTML structure...", type: "building" as const, progress: 30 },
+  { threshold: 40, status: "Building navigation...", type: "building" as const, progress: 35 },
+  { threshold: 60, status: "Creating hero section...", type: "building" as const, progress: 45 },
+  { threshold: 100, status: "Adding content sections...", type: "building" as const, progress: 55 },
+  { threshold: 150, status: "Styling components...", type: "styling" as const, progress: 65 },
+  { threshold: 200, status: "Applying animations...", type: "styling" as const, progress: 75 },
+  { threshold: 300, status: "Polishing design details...", type: "finalizing" as const, progress: 85 },
+  { threshold: 400, status: "Optimizing for responsiveness...", type: "finalizing" as const, progress: 90 },
+  { threshold: 500, status: "Final touches...", type: "finalizing" as const, progress: 95 },
 ];
 
 export function useStreamingGeneration() {
   const [state, setState] = useState<StreamingState>({
     isGenerating: false,
     status: "",
+    statusType: "analyzing",
     preview: "",
     error: null,
     progress: 0,
@@ -34,13 +42,19 @@ export function useStreamingGeneration() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedTextRef = useRef("");
   const lastPreviewRef = useRef("");
+  const startTimeRef = useRef(0);
 
   const stop = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    setState(prev => ({ ...prev, isGenerating: false, status: "Generation cancelled" }));
+    setState(prev => ({ 
+      ...prev, 
+      isGenerating: false, 
+      status: "Generation cancelled",
+      statusType: "error"
+    }));
   }, []);
 
   const generate = useCallback(async ({
@@ -63,20 +77,21 @@ export function useStreamingGeneration() {
     // Reset state
     accumulatedTextRef.current = "";
     lastPreviewRef.current = "";
+    startTimeRef.current = Date.now();
+    
     setState({ 
       isGenerating: true, 
-      status: "🔍 Analyzing your request...", 
+      status: "Analyzing your request...", 
+      statusType: "analyzing",
       preview: "", 
       error: null,
       progress: 5,
       tokensGenerated: 0,
     });
 
-    // Create abort controller
     abortControllerRef.current = new AbortController();
 
     try {
-      // Get auth token
       const { data: { session } } = await supabase.auth.getSession();
       const authToken = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -105,21 +120,21 @@ export function useStreamingGeneration() {
           errorMessage = errorData.error || errorMessage;
         } catch {
           if (response.status === 429) errorMessage = "Rate limit exceeded. Please wait a moment and try again.";
-          else if (response.status === 402) errorMessage = "Insufficient credits. Please add more credits to continue.";
-          else if (response.status === 403) errorMessage = "This model requires a Pro or Business plan. Please upgrade.";
-          else if (response.status === 401) errorMessage = "Session expired. Please refresh and log in again.";
-          else if (response.status >= 500) errorMessage = "AI service temporarily unavailable. Please try again.";
+          else if (response.status === 402) errorMessage = "Insufficient credits. Please add more credits.";
+          else if (response.status === 403) errorMessage = "This model requires a paid plan. Please upgrade.";
+          else if (response.status === 401) errorMessage = "Session expired. Please log in again.";
+          else if (response.status >= 500) errorMessage = "AI service temporarily unavailable.";
         }
         throw new Error(errorMessage);
       }
 
-      if (!response.body) throw new Error("No response body received");
+      if (!response.body) throw new Error("No response received");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let chunkCount = 0;
-      let lastUpdateTime = Date.now();
+      let lastPreviewUpdate = Date.now();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -127,7 +142,6 @@ export function useStreamingGeneration() {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process SSE line by line
         let newlineIdx: number;
         while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
           let line = buffer.slice(0, newlineIdx);
@@ -149,22 +163,23 @@ export function useStreamingGeneration() {
               chunkCount++;
 
               // Update status based on chunk count
-              const statusConfig = [...STATUS_MESSAGES].reverse().find(s => chunkCount >= s.threshold);
-              if (statusConfig) {
+              const phase = [...STATUS_PHASES].reverse().find(p => chunkCount >= p.threshold);
+              if (phase) {
                 setState(prev => ({ 
                   ...prev, 
-                  status: statusConfig.message,
-                  progress: statusConfig.progress,
+                  status: phase.status,
+                  statusType: phase.type,
+                  progress: phase.progress,
                   tokensGenerated: chunkCount,
                 }));
               }
 
-              // Throttled preview updates (every 150ms or every 5 chunks for responsiveness)
+              // Throttled preview updates (every 100ms or 8 chunks)
               const now = Date.now();
-              if (chunkCount % 5 === 0 || now - lastUpdateTime > 150) {
-                lastUpdateTime = now;
+              if (chunkCount % 8 === 0 || now - lastPreviewUpdate > 100) {
+                lastPreviewUpdate = now;
                 const html = extractHtml(accumulatedTextRef.current);
-                if (html && html.length > lastPreviewRef.current.length) {
+                if (html && html.length > lastPreviewRef.current.length + 50) {
                   lastPreviewRef.current = html;
                   setState(prev => ({ ...prev, preview: html }));
                   onChunk?.(html);
@@ -172,42 +187,42 @@ export function useStreamingGeneration() {
               }
             }
           } catch {
-            // Malformed JSON - put back in buffer and wait for more data
             buffer = line + "\n" + buffer;
             break;
           }
         }
       }
 
-      // Final extraction with complete HTML
+      // Final extraction
       const finalHtml = extractHtml(accumulatedTextRef.current);
+      const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
       if (finalHtml && finalHtml.includes("</html>")) {
         setState(prev => ({ 
           ...prev, 
           preview: finalHtml, 
-          status: "✅ Generation complete!",
+          status: `Complete in ${elapsed}s`,
+          statusType: "complete",
           progress: 100,
         }));
         onComplete?.(finalHtml);
       } else if (finalHtml) {
-        // Partial HTML - try to complete it
         const completedHtml = completeHtml(finalHtml);
         setState(prev => ({ 
           ...prev, 
           preview: completedHtml, 
-          status: "✅ Generation complete!",
+          status: `Complete in ${elapsed}s`,
+          statusType: "complete",
           progress: 100,
         }));
         onComplete?.(completedHtml);
       } else {
-        // Fallback: use raw accumulated text
-        const rawContent = accumulatedTextRef.current.trim();
-        const wrappedHtml = wrapInHtml(rawContent);
+        const wrappedHtml = wrapInHtml(accumulatedTextRef.current.trim());
         setState(prev => ({ 
           ...prev, 
           preview: wrappedHtml, 
-          status: "✅ Generation complete!",
+          status: `Complete in ${elapsed}s`,
+          statusType: "complete",
           progress: 100,
         }));
         onComplete?.(wrappedHtml);
@@ -215,12 +230,18 @@ export function useStreamingGeneration() {
 
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        console.log("Generation aborted by user");
+        console.log("Generation aborted");
         return;
       }
 
       const errorMsg = err instanceof Error ? err.message : "An unexpected error occurred";
-      setState(prev => ({ ...prev, error: errorMsg, status: "❌ Generation failed", progress: 0 }));
+      setState(prev => ({ 
+        ...prev, 
+        error: errorMsg, 
+        status: errorMsg,
+        statusType: "error",
+        progress: 0 
+      }));
       onError?.(errorMsg);
     } finally {
       setState(prev => ({ ...prev, isGenerating: false }));
@@ -241,17 +262,14 @@ function extractHtml(text: string): string {
 
   let cleaned = text;
 
-  // Remove thinking tokens (DeepSeek)
+  // Remove DeepSeek thinking tokens
   cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "");
   
   // Remove markdown code fences
-  cleaned = cleaned.replace(/```html\s*/gi, "");
-  cleaned = cleaned.replace(/```typescript\s*/gi, "");
-  cleaned = cleaned.replace(/```tsx\s*/gi, "");
-  cleaned = cleaned.replace(/```jsx\s*/gi, "");
+  cleaned = cleaned.replace(/```(?:html|typescript|tsx|jsx|javascript)?\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
   
-  // Remove JSON wrappers if present
+  // Remove JSON wrappers
   cleaned = cleaned.replace(/^\s*\{[\s\S]*?"preview"\s*:\s*"/i, "");
   cleaned = cleaned.replace(/"\s*\}\s*$/i, "");
   
@@ -265,37 +283,26 @@ function extractHtml(text: string): string {
   const htmlMatch = cleaned.match(/<html[\s\S]*<\/html>/i);
   if (htmlMatch) return "<!DOCTYPE html>\n" + htmlMatch[0].trim();
 
-  // Return partial HTML for streaming (from DOCTYPE onwards)
+  // Return partial from DOCTYPE
   const partialIdx = cleaned.indexOf("<!DOCTYPE html>");
-  if (partialIdx !== -1) {
-    return cleaned.slice(partialIdx);
-  }
+  if (partialIdx !== -1) return cleaned.slice(partialIdx);
 
-  // Try from <html> tag
+  // Try from <html>
   const htmlIdx = cleaned.indexOf("<html");
-  if (htmlIdx !== -1) {
-    return "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx);
-  }
+  if (htmlIdx !== -1) return "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx);
 
   return "";
 }
 
-// Complete partial HTML with closing tags
+// Complete partial HTML
 function completeHtml(html: string): string {
   let completed = html;
-  
-  // Add missing closing tags
-  if (!completed.includes("</body>")) {
-    completed += "\n</body>";
-  }
-  if (!completed.includes("</html>")) {
-    completed += "\n</html>";
-  }
-  
+  if (!completed.includes("</body>")) completed += "\n</body>";
+  if (!completed.includes("</html>")) completed += "\n</html>";
   return completed;
 }
 
-// Wrap raw content in basic HTML structure
+// Wrap raw content in HTML
 function wrapInHtml(content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -304,8 +311,9 @@ function wrapInHtml(content: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Generated Page</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-950 text-white min-h-screen">
+<body class="antialiased bg-gray-950 text-white min-h-screen font-sans">
   ${content}
 </body>
 </html>`;
