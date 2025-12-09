@@ -135,6 +135,108 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
   };
 }
 
+// =============================================
+// CONVERSATION MEMORY - Summarize & Compress
+// =============================================
+interface ConversationMessage {
+  role: "user" | "assistant";
+  content: string;
+  timestamp?: number;
+}
+
+interface ConversationContext {
+  summary: string;
+  recentMessages: ConversationMessage[];
+  projectContext: {
+    websiteType?: string;
+    colorScheme?: string;
+    sections?: string[];
+    modifications?: string[];
+  };
+}
+
+function buildConversationContext(
+  conversationHistory: ConversationMessage[],
+  currentCode: string | null,
+  newPrompt: string
+): ConversationContext {
+  const projectContext: ConversationContext["projectContext"] = {};
+  const modifications: string[] = [];
+  
+  // Extract context from conversation history
+  for (const msg of conversationHistory) {
+    const lower = msg.content.toLowerCase();
+    
+    // Detect website type mentions
+    if (lower.includes("saas") || lower.includes("software")) projectContext.websiteType = "saas";
+    else if (lower.includes("portfolio")) projectContext.websiteType = "portfolio";
+    else if (lower.includes("ecommerce") || lower.includes("shop")) projectContext.websiteType = "ecommerce";
+    else if (lower.includes("agency")) projectContext.websiteType = "agency";
+    else if (lower.includes("landing")) projectContext.websiteType = "landing";
+    
+    // Detect color preferences
+    if (lower.includes("dark theme") || lower.includes("dark mode")) projectContext.colorScheme = "dark";
+    if (lower.includes("blue")) projectContext.colorScheme = "blue";
+    if (lower.includes("purple")) projectContext.colorScheme = "purple";
+    if (lower.includes("cyan") || lower.includes("teal")) projectContext.colorScheme = "cyan";
+    
+    // Track modifications from assistant messages (they describe what was done)
+    if (msg.role === "assistant" && msg.content.length < 200) {
+      modifications.push(msg.content);
+    }
+  }
+  
+  projectContext.modifications = modifications.slice(-5); // Keep last 5 modifications
+  
+  // Build summary of conversation
+  const summary = buildConversationSummary(conversationHistory, projectContext);
+  
+  // Keep only recent messages for context (last 4 exchanges)
+  const recentMessages = conversationHistory.slice(-8);
+  
+  return {
+    summary,
+    recentMessages,
+    projectContext,
+  };
+}
+
+function buildConversationSummary(
+  history: ConversationMessage[],
+  projectContext: ConversationContext["projectContext"]
+): string {
+  if (history.length === 0) return "";
+  
+  const parts: string[] = [];
+  
+  // Add website type context
+  if (projectContext.websiteType) {
+    parts.push(`This is a ${projectContext.websiteType} website project.`);
+  }
+  
+  // Add color scheme
+  if (projectContext.colorScheme) {
+    parts.push(`User prefers ${projectContext.colorScheme} color scheme.`);
+  }
+  
+  // Summarize what's been built
+  const userRequests = history
+    .filter(m => m.role === "user")
+    .map(m => m.content.slice(0, 100))
+    .slice(-5);
+  
+  if (userRequests.length > 1) {
+    parts.push(`Previous requests: ${userRequests.join(" → ")}`);
+  }
+  
+  // Add recent modifications
+  if (projectContext.modifications && projectContext.modifications.length > 0) {
+    parts.push(`Recent changes: ${projectContext.modifications.join(", ")}`);
+  }
+  
+  return parts.join(" ");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -147,6 +249,7 @@ serve(async (req) => {
     console.log("Model:", model);
     console.log("Prompt:", prompt?.slice(0, 100) + "...");
     console.log("Has existing code:", !!currentCode);
+    console.log("Conversation history length:", conversationHistory.length);
 
     if (!prompt || typeof prompt !== 'string') {
       return new Response(
@@ -200,19 +303,27 @@ serve(async (req) => {
     const intent = detectIntent(prompt, isModification);
     console.log("Intent detected:", JSON.stringify(intent));
     
-    // Build context-aware system prompt
+    // Build conversation context with memory
+    const conversationContext = buildConversationContext(conversationHistory, currentCode, prompt);
+    console.log("Conversation context:", JSON.stringify({
+      summaryLength: conversationContext.summary.length,
+      recentMessagesCount: conversationContext.recentMessages.length,
+      projectContext: conversationContext.projectContext,
+    }));
+    
+    // Build context-aware system prompt with conversation memory
     const systemPrompt = isModification 
-      ? buildModificationPrompt(currentCode, intent, prompt) 
-      : buildGenerationPrompt(intent, prompt);
+      ? buildModificationPrompt(currentCode, intent, prompt, conversationContext) 
+      : buildGenerationPrompt(intent, prompt, conversationContext);
 
     console.log("Provider:", modelConfig.provider);
     console.log("Mode:", isModification ? intent.type.toUpperCase() : "NEW");
 
-    // Call the AI provider
+    // Call the AI provider with enhanced context
     if (modelConfig.provider === "openrouter") {
-      return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationHistory);
+      return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
     } else {
-      return await callGemini(modelConfig, systemPrompt, prompt, conversationHistory);
+      return await callGemini(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
     }
 
   } catch (e) {
@@ -402,10 +513,12 @@ async function callGemini(
 // =============================================
 // INTELLIGENT GENERATION PROMPT
 // =============================================
-function buildGenerationPrompt(intent: Intent, userPrompt: string): string {
+function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
     ? getWebsiteTypeContext(intent.websiteType) 
-    : "";
+    : context?.projectContext?.websiteType 
+      ? getWebsiteTypeContext(context.projectContext.websiteType)
+      : "";
   
   const sectionsContext = intent.sections?.length 
     ? `\n\nThe user specifically wants these sections: ${intent.sections.join(", ")}.`
@@ -413,6 +526,13 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string): string {
   
   const styleContext = intent.styleChanges?.length
     ? `\n\nStyle preferences detected: ${intent.styleChanges.join(", ")}.`
+    : context?.projectContext?.colorScheme
+      ? `\n\nUser prefers ${context.projectContext.colorScheme} color scheme based on earlier conversation.`
+      : "";
+
+  // Include conversation memory if available
+  const memoryContext = context?.summary 
+    ? `\n\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to maintain consistency with previous discussions.`
     : "";
 
   return `You are Weblitho, an elite AI website builder. You create stunning, production-ready websites that look like they were designed by top agencies like Vercel, Linear, or Stripe.
@@ -422,6 +542,8 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string): string {
 - You generate complete, functional websites with real content
 - You follow modern design trends and best practices
 - You create accessible, responsive, performant code
+- You remember context from previous conversations to maintain consistency
+${memoryContext}
 
 ## OUTPUT REQUIREMENTS - CRITICAL
 1. Output ONLY valid HTML starting with <!DOCTYPE html>
@@ -547,8 +669,17 @@ Generate a complete, stunning website now. Make it look like it was designed by 
 // =============================================
 // INTELLIGENT MODIFICATION PROMPT
 // =============================================
-function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string): string {
+function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const intentInstructions = getModificationInstructions(intent);
+  
+  // Include conversation memory for better modifications
+  const memoryContext = context?.summary 
+    ? `\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to understand what the user has been building and maintain consistency.`
+    : "";
+  
+  const previousChanges = context?.projectContext?.modifications?.length
+    ? `\n## PREVIOUS CHANGES MADE\n${context.projectContext.modifications.join("\n- ")}`
+    : "";
   
   return `You are Weblitho, modifying an existing website based on user feedback.
 
@@ -556,6 +687,8 @@ function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt
 The user wants to: "${userPrompt}"
 Intent type: ${intent.type.toUpperCase()}
 ${intentInstructions}
+${memoryContext}
+${previousChanges}
 
 ## OUTPUT REQUIREMENTS - CRITICAL
 1. Return ONLY the complete modified HTML
@@ -577,6 +710,7 @@ ${currentCode}
 5. Ensure the result is a complete, working HTML document
 6. ${intent.type === "add_section" ? "Add the new section in the appropriate location" : ""}
 7. ${intent.type === "change_style" ? "Apply style changes consistently across all affected elements" : ""}
+8. Remember context from previous conversations to maintain consistency
 
 Return the complete modified HTML document now.`;
 }
