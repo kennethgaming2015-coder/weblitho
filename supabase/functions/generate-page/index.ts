@@ -511,7 +511,7 @@ async function callGemini(
 }
 
 // =============================================
-// INTELLIGENT GENERATION PROMPT
+// MULTI-FILE PROJECT GENERATION PROMPT
 // =============================================
 function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
@@ -535,23 +535,33 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
     ? `\n\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to maintain consistency with previous discussions.`
     : "";
 
-  return `You are Weblitho, an elite AI website builder. You create stunning, production-ready websites that look like they were designed by top agencies like Vercel, Linear, or Stripe.
+  return `You are Weblitho, an elite AI website builder like Lovable.dev and v0.dev. You generate complete, production-ready multi-file React projects.
 
 ## YOUR CAPABILITIES
 - You understand user intent deeply, even from vague descriptions
-- You generate complete, functional websites with real content
+- You generate complete, functional multi-file projects with real content
 - You follow modern design trends and best practices
 - You create accessible, responsive, performant code
 - You remember context from previous conversations to maintain consistency
 ${memoryContext}
 
-## OUTPUT REQUIREMENTS - CRITICAL
-1. Output ONLY valid HTML starting with <!DOCTYPE html>
-2. End with </html>
-3. NO markdown code blocks (\`\`\`)
-4. NO JSON wrappers
-5. NO explanations before or after
-6. PURE HTML ONLY
+## OUTPUT FORMAT - CRITICAL
+You MUST output a valid JSON object with this EXACT structure:
+{
+  "files": [
+    { "path": "app/layout.tsx", "content": "..." },
+    { "path": "app/page.tsx", "content": "..." },
+    { "path": "components/Navbar.tsx", "content": "..." }
+  ],
+  "preview": "<!DOCTYPE html>..."
+}
+
+RULES:
+1. Output ONLY the JSON object - NO markdown code blocks, NO explanations
+2. The "files" array contains ALL project files as separate components
+3. The "preview" is a self-contained HTML for live preview (CDN React + Tailwind)
+4. Every file must have "path" and "content" keys
+5. Start with { and end with }
 
 ## UNDERSTANDING THE REQUEST
 User wants: "${userPrompt}"
@@ -559,115 +569,171 @@ ${websiteTypeContext}
 ${sectionsContext}
 ${styleContext}
 
-## HTML TEMPLATE STRUCTURE
+## REQUIRED PROJECT STRUCTURE
+Generate these files (minimum):
+
+### app/layout.tsx
+\`\`\`tsx
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+  title: 'Website Title',
+  description: 'Website description',
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body className={inter.className}>{children}</body>
+    </html>
+  )
+}
+\`\`\`
+
+### app/page.tsx
+\`\`\`tsx
+import Navbar from '@/components/Navbar'
+import Hero from '@/components/Hero'
+import Features from '@/components/Features'
+import CTA from '@/components/CTA'
+import Footer from '@/components/Footer'
+
+export default function Home() {
+  return (
+    <main>
+      <Navbar />
+      <Hero />
+      <Features />
+      <CTA />
+      <Footer />
+    </main>
+  )
+}
+\`\`\`
+
+### app/globals.css
+\`\`\`css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  /* Add more CSS variables */
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+}
+\`\`\`
+
+### components/Navbar.tsx
+\`\`\`tsx
+'use client'
+import Link from 'next/link'
+import { useState } from 'react'
+
+export default function Navbar() {
+  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <nav className="...">
+      {/* Navbar content */}
+    </nav>
+  )
+}
+\`\`\`
+
+### components/Hero.tsx
+\`\`\`tsx
+export default function Hero() {
+  return (
+    <section className="...">
+      {/* Hero content */}
+    </section>
+  )
+}
+\`\`\`
+
+### components/Features.tsx, components/CTA.tsx, components/Footer.tsx
+(Similar pattern - each component in its own file)
+
+## DESIGN SYSTEM
+**Colors (Dark Theme Default)**: 
+- Background: slate-950, slate-900
+- Cards: slate-900/50, slate-800/50 with glass effect
+- Accents: cyan-500, violet-500, pink-500 (gradient)
+- Text: white, slate-300, slate-400
+
+**Typography**:
+- Hero: text-5xl md:text-6xl lg:text-7xl font-bold
+- Section titles: text-3xl md:text-4xl font-bold
+- Subtitles: text-xl text-slate-400
+- Body: text-base md:text-lg text-slate-300
+
+**Spacing**:
+- Sections: py-24 md:py-32
+- Containers: max-w-7xl mx-auto px-6
+- Component gaps: gap-6 md:gap-8
+
+**Effects**:
+- Glass: bg-white/5 backdrop-blur-xl border border-white/10
+- Gradients: from-cyan-500 via-violet-500 to-pink-500
+- Shadows: shadow-2xl shadow-cyan-500/20
+- Animations: hover:scale-105 transition-all duration-300
+
+## PREVIEW HTML TEMPLATE
+The "preview" field should be a self-contained HTML that renders the same design:
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Website Title</title>
-  <meta name="description" content="Website description">
+  <title>Preview</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       theme: {
         extend: {
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-          animation: {
-            'fade-in': 'fadeIn 0.6s ease-out forwards',
-            'slide-up': 'slideUp 0.6s ease-out forwards',
-            'slide-down': 'slideDown 0.4s ease-out forwards',
-            'scale-in': 'scaleIn 0.4s ease-out forwards',
-            'float': 'float 6s ease-in-out infinite',
-            'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'gradient': 'gradient 8s linear infinite',
-          },
-          keyframes: {
-            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-            slideUp: { '0%': { opacity: '0', transform: 'translateY(30px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            slideDown: { '0%': { opacity: '0', transform: 'translateY(-20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            scaleIn: { '0%': { opacity: '0', transform: 'scale(0.9)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
-            float: { '0%, 100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-20px)' } },
-            gradient: { '0%, 100%': { backgroundPosition: '0% 50%' }, '50%': { backgroundPosition: '100% 50%' } },
-          }
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
         }
       }
     }
   </script>
   <style>
-    * { scroll-behavior: smooth; }
-    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
-    .gradient-text { background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 50%, #ec4899 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .gradient-bg { background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%); }
-    .gradient-border { background: linear-gradient(135deg, rgba(6,182,212,0.5), rgba(139,92,246,0.5)); }
-    .glow { box-shadow: 0 0 60px rgba(6, 182, 212, 0.3), 0 0 100px rgba(139, 92, 246, 0.2); }
-    .card-hover { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-    .card-hover:hover { transform: translateY(-8px); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-    .btn-glow { position: relative; overflow: hidden; transition: all 0.3s ease; }
-    .btn-glow:hover { box-shadow: 0 0 30px rgba(6, 182, 212, 0.5); transform: translateY(-2px); }
-    .btn-glow::after { content: ''; position: absolute; inset: 0; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent); transform: translateX(-100%); transition: 0.5s; }
-    .btn-glow:hover::after { transform: translateX(100%); }
-    .text-shadow { text-shadow: 0 4px 30px rgba(0,0,0,0.3); }
-    .noise { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"); }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   </style>
 </head>
-<body class="antialiased bg-gray-950 text-white min-h-screen font-sans overflow-x-hidden">
-  <!-- NAVBAR -->
-  <!-- HERO -->
-  <!-- FEATURES -->
-  <!-- SOCIAL PROOF / TESTIMONIALS -->
-  <!-- CTA -->
-  <!-- FOOTER -->
+<body class="bg-slate-950 text-white font-sans antialiased">
+  <!-- All sections inline for preview -->
 </body>
 </html>
 
-## DESIGN SYSTEM
-**Colors**: 
-- Background: gray-950, gray-900
-- Cards: gray-900/50, gray-800/50 with glass effect
-- Accents: cyan-500, purple-500, pink-500 (gradient)
-- Text: white, gray-300, gray-400
-
-**Typography**:
-- Hero: text-5xl md:text-6xl lg:text-7xl font-bold
-- Section titles: text-3xl md:text-4xl font-bold
-- Subtitles: text-xl text-gray-400
-- Body: text-base md:text-lg text-gray-300
-
-**Spacing**:
-- Sections: py-24 md:py-32
-- Containers: max-w-7xl mx-auto px-6
-- Grids: gap-6 md:gap-8
-
-**Components**:
-- Cards: rounded-2xl md:rounded-3xl, glass effect, card-hover
-- Buttons: rounded-xl, px-8 py-4, btn-glow
-- Icons: Use inline SVGs with w-5 h-5 or w-6 h-6
-
-## SVG ICONS LIBRARY
-<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> <!-- Lightning -->
-<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> <!-- Check circle -->
-<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg> <!-- Arrow right -->
-<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> <!-- Check -->
-<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> <!-- Star -->
-<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg> <!-- Mail -->
-
-## REQUIRED QUALITY
+## QUALITY REQUIREMENTS
 1. ✅ Fully responsive (mobile-first)
 2. ✅ Semantic HTML (header, main, section, footer)
-3. ✅ Accessible (proper contrast, alt text)
-4. ✅ Interactive (hover states, transitions)
-5. ✅ Complete (no Lorem ipsum - real compelling content)
+3. ✅ Accessible (proper contrast, alt text, ARIA labels)
+4. ✅ Interactive (hover states, transitions, animations)
+5. ✅ Complete (NO Lorem ipsum - real compelling content)
 6. ✅ Professional copywriting that converts
-7. ✅ Smooth animations with animate-* classes
-8. ✅ Consistent design language throughout
+7. ✅ Consistent design language throughout
+8. ✅ Each component in its own file
+9. ✅ TypeScript with proper types
+10. ✅ Next.js 14 App Router conventions
 
-Generate a complete, stunning website now. Make it look like it was designed by a top agency.`;
+Generate the complete multi-file project JSON now.`;
 }
 
 // =============================================
-// INTELLIGENT MODIFICATION PROMPT
+// MULTI-FILE MODIFICATION PROMPT
 // =============================================
 function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const intentInstructions = getModificationInstructions(intent);
@@ -681,7 +747,7 @@ function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt
     ? `\n## PREVIOUS CHANGES MADE\n${context.projectContext.modifications.join("\n- ")}`
     : "";
   
-  return `You are Weblitho, modifying an existing website based on user feedback.
+  return `You are Weblitho, modifying an existing website project based on user feedback.
 
 ## YOUR TASK
 The user wants to: "${userPrompt}"
@@ -690,29 +756,37 @@ ${intentInstructions}
 ${memoryContext}
 ${previousChanges}
 
-## OUTPUT REQUIREMENTS - CRITICAL
-1. Return ONLY the complete modified HTML
-2. Start with: <!DOCTYPE html>
-3. End with: </html>
-4. NO markdown code blocks
-5. NO JSON wrappers
-6. NO explanations
-7. Include ALL original code that shouldn't change
+## OUTPUT FORMAT - CRITICAL
+You MUST output a valid JSON object with this EXACT structure:
+{
+  "files": [
+    { "path": "app/page.tsx", "content": "..." },
+    { "path": "components/Hero.tsx", "content": "..." }
+  ],
+  "preview": "<!DOCTYPE html>..."
+}
 
-## CURRENT WEBSITE CODE
+RULES:
+1. Output ONLY the JSON object - NO markdown, NO explanations
+2. Include ALL files from the original project (modified or not)
+3. Update only the files that need changes
+4. The "preview" must reflect all changes
+5. Start with { and end with }
+
+## CURRENT PROJECT CODE
 ${currentCode}
 
 ## MODIFICATION RULES
 1. ${intent.type === "fix" ? "Identify and FIX the issue completely" : "Make ONLY the requested changes"}
 2. PRESERVE all structure, styles, and functionality not being changed
-3. Keep all <script> tags, CSS, and Tailwind config intact
+3. Keep all imports and component relationships intact
 4. Maintain design consistency and visual quality
-5. Ensure the result is a complete, working HTML document
-6. ${intent.type === "add_section" ? "Add the new section in the appropriate location" : ""}
-7. ${intent.type === "change_style" ? "Apply style changes consistently across all affected elements" : ""}
-8. Remember context from previous conversations to maintain consistency
+5. Ensure all files remain valid TypeScript/React
+6. ${intent.type === "add_section" ? "Add the new component file and import it in page.tsx" : ""}
+7. ${intent.type === "change_style" ? "Apply style changes consistently across all affected components" : ""}
+8. Remember context from previous conversations
 
-Return the complete modified HTML document now.`;
+Return the complete modified project JSON now.`;
 }
 
 // =============================================
@@ -721,62 +795,77 @@ Return the complete modified HTML document now.`;
 function getWebsiteTypeContext(type: string): string {
   const contexts: Record<string, string> = {
     saas: `
-This is a SaaS/Software product website. Include:
-- Value proposition hero with product screenshot/mockup
-- Features grid showing key capabilities
-- Pricing section with tiers (Free, Pro, Enterprise)
-- Social proof (logos, testimonials, stats)
-- CTA for free trial or demo
+This is a SaaS/Software product website. Include these components:
+- Navbar.tsx: Logo, nav links, CTA button
+- Hero.tsx: Value proposition with product screenshot/mockup
+- Features.tsx: Features grid (6 items minimum)
+- Pricing.tsx: Pricing tiers (Free, Pro, Enterprise)
+- Testimonials.tsx: Customer reviews with avatars
+- CTA.tsx: Final call-to-action
+- Footer.tsx: Links, social, copyright
 Focus on: Trust, clarity, conversion`,
 
     landing: `
-This is a landing page. Focus on:
-- Strong hero with clear headline and CTA
-- Benefits-focused copy
-- Social proof elements
-- Single clear call-to-action
-- Minimal distractions
+This is a landing page. Include these components:
+- Navbar.tsx: Minimal navigation
+- Hero.tsx: Strong headline, subheadline, CTA
+- Features.tsx: Key benefits (3-4 items)
+- SocialProof.tsx: Logos, testimonials, stats
+- CTA.tsx: Single clear call-to-action
+- Footer.tsx: Minimal footer
 Focus on: Conversion, clarity, urgency`,
 
     portfolio: `
-This is a portfolio/personal website. Include:
-- Hero with name, title, and brief intro
-- Work/projects showcase grid
-- About section with skills
-- Contact section
+This is a portfolio/personal website. Include these components:
+- Navbar.tsx: Name, nav links
+- Hero.tsx: Name, title, intro
+- Projects.tsx: Work showcase grid
+- About.tsx: Bio, skills, experience
+- Contact.tsx: Contact form or info
+- Footer.tsx: Social links
 Focus on: Personality, work quality, credibility`,
 
     ecommerce: `
-This is an e-commerce/shop website. Include:
-- Hero featuring key products or offers
-- Product categories or featured items
-- Trust badges and guarantees
-- Testimonials/reviews
+This is an e-commerce website. Include these components:
+- Navbar.tsx: Logo, search, cart icon
+- Hero.tsx: Featured product/offer
+- ProductGrid.tsx: Product cards
+- Categories.tsx: Category navigation
+- Testimonials.tsx: Customer reviews
+- Footer.tsx: Shipping, support, legal
 Focus on: Trust, product appeal, easy navigation`,
 
     agency: `
-This is an agency/studio website. Include:
-- Bold hero with tagline
-- Services/capabilities
-- Case studies or work showcase
-- Team section
-- Client logos
+This is an agency/studio website. Include these components:
+- Navbar.tsx: Logo, services, contact
+- Hero.tsx: Bold tagline, showreel/visual
+- Services.tsx: Capabilities grid
+- Work.tsx: Case studies/portfolio
+- Team.tsx: Team members
+- Contact.tsx: Contact form
+- Footer.tsx: Full footer
 Focus on: Expertise, creativity, results`,
 
     startup: `
-This is a startup/launch page. Include:
-- Exciting hero with product vision
-- Problem/solution narrative
-- Early access or waitlist signup
-- Team/investors (if applicable)
+This is a startup/launch page. Include these components:
+- Navbar.tsx: Logo, waitlist CTA
+- Hero.tsx: Vision statement, signup
+- Problem.tsx: Problem/solution narrative
+- Features.tsx: What you're building
+- Team.tsx: Founders/team
+- CTA.tsx: Waitlist/early access
+- Footer.tsx: Minimal footer
 Focus on: Vision, excitement, early adoption`,
 
     crypto: `
-This is a crypto/Web3 website. Include:
-- Dynamic hero with key metrics
-- Features/benefits of the protocol
-- Tokenomics or how it works
-- Community links (Discord, Twitter)
+This is a crypto/Web3 website. Include these components:
+- Navbar.tsx: Logo, connect wallet
+- Hero.tsx: Protocol value prop, stats
+- Features.tsx: Protocol features
+- HowItWorks.tsx: Step-by-step
+- Tokenomics.tsx: Token info
+- Community.tsx: Discord, Twitter links
+- Footer.tsx: Links, audit badges
 Focus on: Innovation, security, community`,
   };
   
@@ -790,14 +879,14 @@ function getModificationInstructions(intent: Intent): string {
   const instructions: Record<string, string> = {
     fix: `
 FIXING MODE:
-- Carefully analyze the code for the reported issue
-- Look for syntax errors, missing elements, or broken functionality
+- Carefully analyze all files for the reported issue
+- Look for syntax errors, missing imports, or broken components
 - Fix the issue while preserving all other code
-- Test mentally that the fix addresses the problem`,
+- Ensure all imports are correct`,
 
     enhance: `
 ENHANCEMENT MODE:
-- Improve visual quality and polish
+- Improve visual quality and polish across all components
 - Add subtle animations and micro-interactions
 - Enhance typography and spacing
 - Make colors more vibrant and consistent
@@ -805,19 +894,19 @@ ENHANCEMENT MODE:
 
     add_section: `
 ADD SECTION MODE:
-- Add the new section in the logical location
+- Create a new component file for the section
+- Add the import to page.tsx
 - Match the existing design system exactly
 - Use consistent spacing (py-24 md:py-32)
-- Maintain visual hierarchy
 - Ensure smooth transitions between sections`,
 
     change_style: `
 STYLE CHANGE MODE:
-- Apply the style changes consistently
-- Update all related elements (buttons, cards, headings)
+- Apply the style changes across all affected components
+- Update Tailwind classes consistently
 - Maintain visual coherence
 - Keep accessibility in mind (contrast ratios)
-- Update CSS variables if using a theme`,
+- Update globals.css if needed`,
 
     change_content: `
 CONTENT CHANGE MODE:
@@ -829,9 +918,9 @@ CONTENT CHANGE MODE:
     modify: `
 MODIFICATION MODE:
 - Make the specific changes requested
+- Update only necessary files
 - Preserve everything not being changed
-- Maintain design quality and consistency
-- Ensure the result looks intentional`,
+- Maintain design quality and consistency`,
   };
   
   return instructions[intent.type] || instructions.modify;
