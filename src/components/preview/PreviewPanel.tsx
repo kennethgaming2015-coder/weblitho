@@ -18,6 +18,7 @@ interface PreviewPanelProps {
   type?: "web";
   metadata?: any;
   isGenerating?: boolean;
+  isComplete?: boolean; // New prop to track if generation is complete
   generationStatus?: string;
   generationProgress?: number;
   validation?: ValidationResult | null;
@@ -33,7 +34,8 @@ const viewportDimensions = {
 
 export const PreviewPanel = ({ 
   code, 
-  isGenerating = false, 
+  isGenerating = false,
+  isComplete = false, // Default to false
   generationStatus = "", 
   generationProgress = 0,
   validation 
@@ -47,28 +49,45 @@ export const PreviewPanel = ({
   // Clean and extract HTML from code
   const cleanedHtml = cleanHtml(code);
   const hasContent = cleanedHtml.length > 100;
-  const isComplete = cleanedHtml.includes("</html>");
 
-  // Refresh iframe when code changes significantly
+  // Refresh iframe when code changes significantly AFTER generation is complete
   useEffect(() => {
-    if (cleanedHtml && cleanedHtml !== lastCodeRef.current) {
-      // Only refresh if this is complete HTML or significant update
-      if (isComplete || cleanedHtml.length > lastCodeRef.current.length + 500) {
-        lastCodeRef.current = cleanedHtml;
-        // Small delay to batch updates
-        const timer = setTimeout(() => setIframeKey(k => k + 1), 100);
-        return () => clearTimeout(timer);
-      }
+    if (isComplete && cleanedHtml && cleanedHtml !== lastCodeRef.current) {
+      lastCodeRef.current = cleanedHtml;
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => setIframeKey(k => k + 1), 100);
+      return () => clearTimeout(timer);
     }
   }, [cleanedHtml, isComplete]);
 
-  // Show loader only when generating AND no preview content yet
-  if (isGenerating && !hasContent) {
+  // Show loader while generating OR when not complete yet
+  if (isGenerating || (!isComplete && !hasContent)) {
+    if (isGenerating) {
+      return <GenerationLoader status={generationStatus} isGenerating={isGenerating} progress={generationProgress} />;
+    }
+    // Empty state - waiting for first generation
+    return (
+      <div className="h-full flex items-center justify-center bg-card/30">
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20">
+            <Eye className="h-8 w-8 text-primary/60" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-foreground/60">Preview Area</p>
+            <p className="text-xs text-muted-foreground">Your creation will appear here</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loader until generation is truly complete (even if we have content)
+  if (!isComplete && isGenerating) {
     return <GenerationLoader status={generationStatus} isGenerating={isGenerating} progress={generationProgress} />;
   }
 
-  // Empty state
-  if (!hasContent && !isGenerating) {
+  // Empty state when no content and not generating
+  if (!hasContent && isComplete) {
     return (
       <div className="h-full flex items-center justify-center bg-card/30">
         <div className="text-center space-y-4">
@@ -128,15 +147,13 @@ export const PreviewPanel = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-semibold text-foreground">Live Preview</h3>
-              {isGenerating && (
-                <span className="flex items-center gap-1.5 text-xs text-primary animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                  Streaming...
-                </span>
-              )}
+              <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+                <CheckCircle className="h-3 w-3" />
+                Ready
+              </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {isComplete ? "React + Tailwind CSS" : "Building..."}
+              React + Tailwind CSS
             </p>
           </div>
           
@@ -266,9 +283,17 @@ function cleanHtml(code: string): string {
   cleaned = cleaned.replace(/```jsx\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
   
-  // Remove JSON wrappers
-  cleaned = cleaned.replace(/^\s*\{[\s\S]*?"preview"\s*:\s*"/i, "");
-  cleaned = cleaned.replace(/"\s*\}\s*$/i, "");
+  // Try to extract preview from JSON output
+  const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*}|\\"[\s\S]*?(?<!\\)")/);
+  if (previewMatch) {
+    let htmlFromJson = previewMatch[1];
+    htmlFromJson = htmlFromJson.replace(/\\n/g, '\n');
+    htmlFromJson = htmlFromJson.replace(/\\"/g, '"');
+    htmlFromJson = htmlFromJson.replace(/\\\\/g, '\\');
+    if (htmlFromJson.includes("<!DOCTYPE html>")) {
+      cleaned = htmlFromJson;
+    }
+  }
   
   cleaned = cleaned.trim();
 

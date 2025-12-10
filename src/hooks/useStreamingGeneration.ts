@@ -9,6 +9,7 @@ interface StreamingState {
   error: string | null;
   progress: number;
   tokensGenerated: number;
+  isComplete: boolean; // New flag to track if generation is fully complete
 }
 
 // Detailed status messages with timing
@@ -37,6 +38,7 @@ export function useStreamingGeneration() {
     error: null,
     progress: 0,
     tokensGenerated: 0,
+    isComplete: false,
   });
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -53,7 +55,8 @@ export function useStreamingGeneration() {
       ...prev, 
       isGenerating: false, 
       status: "Generation cancelled",
-      statusType: "error"
+      statusType: "error",
+      isComplete: false,
     }));
   }, []);
 
@@ -74,7 +77,7 @@ export function useStreamingGeneration() {
     onComplete?: (html: string) => void;
     onError?: (error: string) => void;
   }) => {
-    // Reset state
+    // Reset state - start with isComplete: false
     accumulatedTextRef.current = "";
     lastPreviewRef.current = "";
     startTimeRef.current = Date.now();
@@ -87,6 +90,7 @@ export function useStreamingGeneration() {
       error: null,
       progress: 5,
       tokensGenerated: 0,
+      isComplete: false, // Important: not complete yet
     });
 
     abortControllerRef.current = new AbortController();
@@ -174,15 +178,15 @@ export function useStreamingGeneration() {
                 }));
               }
 
-              // Throttled preview updates (every 100ms or 8 chunks)
+              // Don't update preview during generation - keep showing loader
+              // Only call onChunk for background processing if needed
               const now = Date.now();
-              if (chunkCount % 8 === 0 || now - lastPreviewUpdate > 100) {
+              if (chunkCount % 20 === 0 || now - lastPreviewUpdate > 200) {
                 lastPreviewUpdate = now;
                 const html = extractHtml(accumulatedTextRef.current);
-                if (html && html.length > lastPreviewRef.current.length + 50) {
+                if (html) {
                   lastPreviewRef.current = html;
-                  setState(prev => ({ ...prev, preview: html }));
-                  onChunk?.(html);
+                  // Don't update preview state during generation - wait for completion
                 }
               }
             }
@@ -193,7 +197,7 @@ export function useStreamingGeneration() {
         }
       }
 
-      // Final extraction
+      // Final extraction - NOW we show the preview
       const finalHtml = extractHtml(accumulatedTextRef.current);
       const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
@@ -204,6 +208,7 @@ export function useStreamingGeneration() {
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
+          isComplete: true, // Now complete!
         }));
         onComplete?.(finalHtml);
       } else if (finalHtml) {
@@ -214,6 +219,7 @@ export function useStreamingGeneration() {
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
+          isComplete: true,
         }));
         onComplete?.(completedHtml);
       } else {
@@ -224,6 +230,7 @@ export function useStreamingGeneration() {
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
+          isComplete: true,
         }));
         onComplete?.(wrappedHtml);
       }
@@ -240,7 +247,8 @@ export function useStreamingGeneration() {
         error: errorMsg, 
         status: errorMsg,
         statusType: "error",
-        progress: 0 
+        progress: 0,
+        isComplete: false,
       }));
       onError?.(errorMsg);
     } finally {
@@ -269,9 +277,18 @@ function extractHtml(text: string): string {
   cleaned = cleaned.replace(/```(?:html|typescript|tsx|jsx|javascript)?\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
   
-  // Remove JSON wrappers
-  cleaned = cleaned.replace(/^\s*\{[\s\S]*?"preview"\s*:\s*"/i, "");
-  cleaned = cleaned.replace(/"\s*\}\s*$/i, "");
+  // Try to extract preview from JSON output
+  const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)"\s*\}/);
+  if (previewMatch) {
+    // Unescape the JSON string
+    let htmlFromJson = previewMatch[1];
+    htmlFromJson = htmlFromJson.replace(/\\n/g, '\n');
+    htmlFromJson = htmlFromJson.replace(/\\"/g, '"');
+    htmlFromJson = htmlFromJson.replace(/\\\\/g, '\\');
+    if (htmlFromJson.includes("<!DOCTYPE html>")) {
+      cleaned = htmlFromJson;
+    }
+  }
   
   cleaned = cleaned.trim();
 
