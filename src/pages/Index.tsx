@@ -682,6 +682,7 @@ const Index = () => {
                   <PreviewPanel
                     code={generatedContent?.preview || streaming.preview}
                     isGenerating={streaming.isGenerating}
+                    isComplete={streaming.isComplete}
                     generationStatus={streaming.status}
                     generationProgress={streaming.progress}
                     validation={null}
@@ -694,6 +695,7 @@ const Index = () => {
                       code={generatedContent.preview}
                       metadata={generatedContent.metadata}
                       isGenerating={false}
+                      isComplete={true}
                       generationStatus=""
                       validation={validation}
                     />
