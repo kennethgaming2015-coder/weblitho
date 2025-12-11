@@ -189,6 +189,8 @@ const Index = () => {
           selected_model: selectedModel,
         });
         if (newProject) {
+          // IMPORTANT: Set the ref BEFORE updating URL to prevent useEffect from reloading
+          loadedProjectIdRef.current = newProject.id;
           setSearchParams({ project: newProject.id });
           setProjectName(newProject.name);
         }
