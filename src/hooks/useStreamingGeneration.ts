@@ -4,12 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 interface StreamingState {
   isGenerating: boolean;
   status: string;
-  statusType: "analyzing" | "planning" | "building" | "styling" | "finalizing" | "complete" | "error";
+  statusType: "analyzing" | "planning" | "building" | "styling" | "finalizing" | "complete" | "error" | "conversation";
   preview: string;
   error: string | null;
   progress: number;
   tokensGenerated: number;
-  isComplete: boolean; // New flag to track if generation is fully complete
+  isComplete: boolean;
+  isConversation: boolean; // New: indicates this is a chat response, not code
+  conversationResponse: string; // New: holds conversation text
 }
 
 // Detailed status messages with timing
@@ -39,6 +41,8 @@ export function useStreamingGeneration() {
     progress: 0,
     tokensGenerated: 0,
     isComplete: false,
+    isConversation: false,
+    conversationResponse: "",
   });
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -57,6 +61,8 @@ export function useStreamingGeneration() {
       status: "Generation cancelled",
       statusType: "error",
       isComplete: false,
+      isConversation: false,
+      conversationResponse: "",
     }));
   }, []);
 
@@ -90,7 +96,9 @@ export function useStreamingGeneration() {
       error: null,
       progress: 5,
       tokensGenerated: 0,
-      isComplete: false, // Important: not complete yet
+      isComplete: false,
+      isConversation: false,
+      conversationResponse: "",
     });
 
     abortControllerRef.current = new AbortController();
@@ -134,12 +142,88 @@ export function useStreamingGeneration() {
 
       if (!response.body) throw new Error("No response received");
 
+      // Check if this is a conversation response
+      const isConversationResponse = response.headers.get("X-Response-Type") === "conversation";
+      
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       let chunkCount = 0;
       let lastPreviewUpdate = Date.now();
 
+      // Handle conversation mode differently
+      if (isConversationResponse) {
+        setState(prev => ({
+          ...prev,
+          status: "AI is thinking...",
+          statusType: "conversation",
+          isConversation: true,
+        }));
+        
+        let conversationText = "";
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          let newlineIdx: number;
+          while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+            let line = buffer.slice(0, newlineIdx);
+            buffer = buffer.slice(newlineIdx + 1);
+
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content;
+              
+              if (content) {
+                // Remove thinking tokens from conversation
+                const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
+                conversationText += cleanContent;
+                
+                // Update conversation response in real-time
+                setState(prev => ({
+                  ...prev,
+                  conversationResponse: conversationText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim(),
+                }));
+              }
+            } catch {
+              buffer = line + "\n" + buffer;
+              break;
+            }
+          }
+        }
+
+        // Clean final response
+        const cleanedResponse = conversationText
+          .replace(/<think>[\s\S]*?<\/think>/gi, "")
+          .trim();
+
+        setState(prev => ({
+          ...prev,
+          isGenerating: false,
+          isComplete: true,
+          isConversation: true,
+          conversationResponse: cleanedResponse,
+          status: "Ready",
+          statusType: "complete",
+          progress: 100,
+        }));
+
+        // Return conversation response through onComplete
+        onComplete?.(cleanedResponse);
+        return;
+      }
+
+      // Standard generation mode
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -179,14 +263,12 @@ export function useStreamingGeneration() {
               }
 
               // Don't update preview during generation - keep showing loader
-              // Only call onChunk for background processing if needed
               const now = Date.now();
               if (chunkCount % 20 === 0 || now - lastPreviewUpdate > 200) {
                 lastPreviewUpdate = now;
                 const html = extractHtml(accumulatedTextRef.current);
                 if (html) {
                   lastPreviewRef.current = html;
-                  // Don't update preview state during generation - wait for completion
                 }
               }
             }
@@ -208,7 +290,8 @@ export function useStreamingGeneration() {
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
-          isComplete: true, // Now complete!
+          isComplete: true,
+          isConversation: false,
         }));
         onComplete?.(finalHtml);
       } else if (finalHtml) {
@@ -220,6 +303,7 @@ export function useStreamingGeneration() {
           statusType: "complete",
           progress: 100,
           isComplete: true,
+          isConversation: false,
         }));
         onComplete?.(completedHtml);
       } else {
@@ -231,6 +315,7 @@ export function useStreamingGeneration() {
           statusType: "complete",
           progress: 100,
           isComplete: true,
+          isConversation: false,
         }));
         onComplete?.(wrappedHtml);
       }
@@ -249,6 +334,8 @@ export function useStreamingGeneration() {
         statusType: "error",
         progress: 0,
         isComplete: false,
+        isConversation: false,
+        conversationResponse: "",
       }));
       onError?.(errorMsg);
     } finally {

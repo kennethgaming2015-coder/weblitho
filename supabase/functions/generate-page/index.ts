@@ -19,16 +19,60 @@ const isPaidPlan = (plan: string): boolean => plan === 'pro' || plan === 'busine
 // INTENT DETECTION - Understand what user wants
 // =============================================
 interface Intent {
-  type: "new" | "modify" | "fix" | "enhance" | "add_section" | "change_style" | "change_content";
+  type: "new" | "modify" | "fix" | "enhance" | "add_section" | "change_style" | "change_content" | "conversation";
   confidence: number;
   websiteType?: string;
   sections?: string[];
   styleChanges?: string[];
   contentChanges?: string[];
+  isQuestion?: boolean;
 }
 
 function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
-  const lowerPrompt = prompt.toLowerCase();
+  const lowerPrompt = prompt.toLowerCase().trim();
+  
+  // CONVERSATION DETECTION - Check if user is asking a question or wants to discuss
+  const questionPatterns = [
+    /^what\s+(can|should|would|could|do)/i,
+    /^how\s+(can|should|would|could|do)/i,
+    /^can\s+(you|we|i)/i,
+    /^could\s+(you|we|i)/i,
+    /^would\s+(you|it|this)/i,
+    /^is\s+(there|it|this)/i,
+    /^are\s+(there|you)/i,
+    /^do\s+(you|we)/i,
+    /^should\s+(i|we)/i,
+    /^why\s+/i,
+    /^where\s+/i,
+    /^which\s+/i,
+    /^tell\s+me/i,
+    /^explain/i,
+    /^describe/i,
+    /^help\s+me\s+(understand|decide|choose)/i,
+    /\?$/,
+  ];
+  
+  const conversationKeywords = [
+    "what can we", "what should we", "what would you", "what do you think",
+    "what are my options", "what options", "any suggestions", "any ideas",
+    "help me decide", "help me choose", "recommend", "suggestion",
+    "thoughts on", "your opinion", "advice", "guide me",
+    "explain", "tell me about", "describe", "clarify",
+    "not sure", "don't know", "wondering", "curious",
+    "possibilities", "alternatives", "ideas for",
+  ];
+  
+  const isQuestion = questionPatterns.some(p => p.test(lowerPrompt));
+  const isConversational = conversationKeywords.some(k => lowerPrompt.includes(k));
+  
+  // If it's clearly a question or conversational, return conversation intent
+  if ((isQuestion || isConversational) && !lowerPrompt.includes("create") && !lowerPrompt.includes("build") && !lowerPrompt.includes("generate") && !lowerPrompt.includes("make me")) {
+    return {
+      type: "conversation",
+      confidence: 0.9,
+      isQuestion: true,
+    };
+  }
   
   // Keywords for different intents
   const modifyKeywords = ["change", "update", "modify", "edit", "make it", "switch", "replace"];
@@ -132,6 +176,7 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
     websiteType,
     sections: sections.length > 0 ? sections : undefined,
     styleChanges: styleChanges.length > 0 ? styleChanges : undefined,
+    isQuestion: false,
   };
 }
 
@@ -302,6 +347,12 @@ serve(async (req) => {
     const isModification = currentCode !== null && currentCode.length > 100;
     const intent = detectIntent(prompt, isModification);
     console.log("Intent detected:", JSON.stringify(intent));
+    
+    // Handle CONVERSATION intent - discuss instead of generate
+    if (intent.type === "conversation") {
+      console.log("=== CONVERSATION MODE ===");
+      return await handleConversation(modelConfig, prompt, conversationHistory, currentCode, isModification);
+    }
     
     // Build conversation context with memory
     const conversationContext = buildConversationContext(conversationHistory, currentCode, prompt);
@@ -511,8 +562,102 @@ async function callGemini(
 }
 
 // =============================================
-// MULTI-FILE PROJECT GENERATION PROMPT
+// CONVERSATION MODE - Chat without generating
 // =============================================
+async function handleConversation(
+  modelConfig: { model: string; maxTokens: number; provider: string },
+  userPrompt: string,
+  conversationHistory: Array<{ role: string; content: string }>,
+  currentCode: string | null,
+  hasExistingProject: boolean
+) {
+  const conversationSystemPrompt = buildConversationSystemPrompt(currentCode, hasExistingProject);
+  
+  // Use OpenRouter for conversation (free model)
+  const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
+  if (!OPENROUTER_KEY) throw new Error("OPENROUTER_KEY not configured");
+
+  const messages = [
+    { role: "system", content: conversationSystemPrompt },
+    ...conversationHistory.slice(-10),
+    { role: "user", content: userPrompt }
+  ];
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://weblitho.app",
+      "X-Title": "Weblitho AI",
+    },
+    body: JSON.stringify({
+      model: "tngtech/deepseek-r1t2-chimera:free",
+      messages,
+      stream: true,
+      max_tokens: 2000, // Shorter for conversation
+      temperature: 0.8,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Conversation error:", response.status, errorText);
+    return new Response(
+      JSON.stringify({ error: "Chat failed. Please try again." }),
+      { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  // Return with special header to indicate this is a conversation response
+  return new Response(response.body, {
+    headers: { 
+      ...corsHeaders, 
+      "Content-Type": "text/event-stream",
+      "X-Response-Type": "conversation", // Frontend can use this
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+    },
+  });
+}
+
+function buildConversationSystemPrompt(currentCode: string | null, hasExistingProject: boolean): string {
+  const projectContext = hasExistingProject 
+    ? `\n\nThe user has an existing website project. You can discuss modifications, improvements, or answer questions about it. The current code is available for reference.`
+    : `\n\nThe user hasn't started building yet. Help them plan their website by discussing their needs, goals, and preferences.`;
+
+  return `You are Weblitho, a friendly AI assistant for website building. You're having a conversation with the user - NOT generating code right now.
+
+## YOUR ROLE
+- Have a natural conversation to understand what the user wants
+- Ask clarifying questions when needed
+- Suggest ideas and possibilities
+- Help users make decisions about their website
+- Provide guidance on design, features, and best practices
+${projectContext}
+
+## CONVERSATION GUIDELINES
+1. Be helpful, friendly, and concise
+2. Ask ONE question at a time to understand needs
+3. Suggest specific options when relevant (e.g., "Would you like a dark or light theme?")
+4. When ready to build, tell the user to describe what they want to create
+5. NEVER output code or JSON - this is a discussion only
+6. Keep responses short (2-4 sentences typically)
+
+## EXAMPLE RESPONSES
+
+User: "What can we change?"
+You: "Great question! Looking at your current site, here are some ideas: I could enhance the hero section with more animations, add a testimonials section for social proof, or change the color scheme. What sounds most interesting to you?"
+
+User: "I'm not sure what kind of website I need"
+You: "Let me help you figure that out! What's the main purpose - are you showcasing your work (portfolio), selling something (e-commerce), promoting a business (landing page), or something else?"
+
+User: "Should I add more sections?"
+You: "It depends on your goals! A testimonials section builds trust, a FAQ reduces support questions, and a pricing table helps with conversions. What's most important for your visitors?"
+
+Remember: You're here to DISCUSS and HELP PLAN, not to generate code. Keep it conversational!`;
+}
+
 function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
     ? getWebsiteTypeContext(intent.websiteType) 
