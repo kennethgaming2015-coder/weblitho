@@ -330,20 +330,39 @@ const Index = () => {
       model: model || selectedModel,
       conversationHistory: messages,
       onChunk: (html) => {
-        // Update preview as chunks come in
-        setGeneratedContent({ 
-          type: "web", 
-          preview: html,
-          files: []
-        });
+        // Only update preview for actual code generation, not conversation
+        if (!streaming.isConversation) {
+          setGeneratedContent({ 
+            type: "web", 
+            preview: html,
+            files: []
+          });
+        }
       },
-      onComplete: async (finalHtml) => {
-        console.log("Generation complete - preview length:", finalHtml.length);
+      onComplete: async (response) => {
+        // Check if this was a conversation response
+        if (streaming.isConversation) {
+          console.log("Conversation response received");
+          
+          // Add AI response to chat
+          setMessages(prev => [...prev, { 
+            role: "assistant" as const, 
+            content: response 
+          }]);
+          
+          // Don't deduct full credits for conversation (minimal cost)
+          await deductCredits(0.1, `Chat: ${message.slice(0, 30)}...`, projectId || undefined);
+          
+          return;
+        }
+        
+        // Standard generation response
+        console.log("Generation complete - preview length:", response.length);
         
         // Set final content
         setGeneratedContent({ 
           type: "web", 
-          preview: finalHtml,
+          preview: response,
           files: []
         });
         
@@ -361,7 +380,7 @@ const Index = () => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
             },
-            body: JSON.stringify({ code: finalHtml }),
+            body: JSON.stringify({ code: response }),
           });
           
           if (validationResp.ok) {
@@ -381,7 +400,7 @@ const Index = () => {
         }
 
         // Deduct credits
-        const outputLength = finalHtml.length;
+        const outputLength = response.length;
         const usedModel = model || selectedModel;
         const creditCost = calculateCost(outputLength, usedModel);
         const deducted = await deductCredits(creditCost, `Generated: ${message.slice(0, 50)}...`, projectId || undefined);
@@ -391,7 +410,7 @@ const Index = () => {
         }
         
         // Auto-save project
-        await saveProject(finalHtml, [], updatedMessages);
+        await saveProject(response, [], updatedMessages);
 
         toast({
           title: "Page Generated",
