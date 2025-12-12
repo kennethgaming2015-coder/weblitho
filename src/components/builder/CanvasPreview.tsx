@@ -74,6 +74,9 @@ export const CanvasPreview = ({ content }: CanvasPreviewProps) => {
                     * {
                       box-sizing: border-box;
                     }
+                    a, button, input, select, textarea {
+                      cursor: pointer;
+                    }
                   </style>
                 </head>
                 <body>
@@ -82,7 +85,8 @@ export const CanvasPreview = ({ content }: CanvasPreviewProps) => {
               </html>
             `}
             className="w-full h-full border-0"
-            style={{ minHeight: "600px" }}
+            style={{ minHeight: "600px", pointerEvents: "auto" }}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"
             title="Preview"
           />
         </div>
