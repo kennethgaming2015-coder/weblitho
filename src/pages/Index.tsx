@@ -335,7 +335,7 @@ const Index = () => {
           setGeneratedContent({ 
             type: "web", 
             preview: html,
-            files: []
+            files: streaming.files || []
           });
         }
       },
@@ -359,11 +359,11 @@ const Index = () => {
         // Standard generation response
         console.log("Generation complete - preview length:", response.length);
         
-        // Set final content
+        // Set final content with files from streaming
         setGeneratedContent({ 
           type: "web", 
           preview: response,
-          files: []
+          files: streaming.files || []
         });
         
         const updatedMessages = [...messages, 
