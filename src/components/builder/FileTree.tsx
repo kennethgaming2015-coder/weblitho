@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown, FileCode, FileText, Folder, FolderOpen, Code2, Braces, FileJson, FileType } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ProjectFile } from "@/hooks/useStreamingGeneration";
 
 interface ExtractedFile {
   name: string;
@@ -10,11 +11,6 @@ interface ExtractedFile {
   content?: string;
   children?: ExtractedFile[];
   lines?: number;
-}
-
-interface ProjectFile {
-  path: string;
-  content: string;
 }
 
 interface FileTreeProps {

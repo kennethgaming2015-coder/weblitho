@@ -1,17 +1,23 @@
 import { useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export interface ProjectFile {
+  path: string;
+  content: string;
+}
+
 interface StreamingState {
   isGenerating: boolean;
   status: string;
   statusType: "analyzing" | "planning" | "building" | "styling" | "finalizing" | "complete" | "error" | "conversation";
   preview: string;
+  files: ProjectFile[]; // Multi-file project structure
   error: string | null;
   progress: number;
   tokensGenerated: number;
   isComplete: boolean;
-  isConversation: boolean; // New: indicates this is a chat response, not code
-  conversationResponse: string; // New: holds conversation text
+  isConversation: boolean;
+  conversationResponse: string;
 }
 
 // Detailed status messages with timing
@@ -37,6 +43,7 @@ export function useStreamingGeneration() {
     status: "",
     statusType: "analyzing",
     preview: "",
+    files: [],
     error: null,
     progress: 0,
     tokensGenerated: 0,
@@ -93,6 +100,7 @@ export function useStreamingGeneration() {
       status: "Analyzing your request...", 
       statusType: "analyzing",
       preview: "", 
+      files: [],
       error: null,
       progress: 5,
       tokensGenerated: 0,
@@ -266,9 +274,9 @@ export function useStreamingGeneration() {
               const now = Date.now();
               if (chunkCount % 20 === 0 || now - lastPreviewUpdate > 200) {
                 lastPreviewUpdate = now;
-                const html = extractHtml(accumulatedTextRef.current);
-                if (html) {
-                  lastPreviewRef.current = html;
+                const output = extractOutput(accumulatedTextRef.current);
+                if (output.preview) {
+                  lastPreviewRef.current = output.preview;
                 }
               }
             }
@@ -279,26 +287,28 @@ export function useStreamingGeneration() {
         }
       }
 
-      // Final extraction - NOW we show the preview
-      const finalHtml = extractHtml(accumulatedTextRef.current);
+      // Final extraction - NOW we show the preview and files
+      const output = extractOutput(accumulatedTextRef.current);
       const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
-      if (finalHtml && finalHtml.includes("</html>")) {
+      if (output.preview && output.preview.includes("</html>")) {
         setState(prev => ({ 
           ...prev, 
-          preview: finalHtml, 
+          preview: output.preview, 
+          files: output.files,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(finalHtml);
-      } else if (finalHtml) {
-        const completedHtml = completeHtml(finalHtml);
+        onComplete?.(output.preview);
+      } else if (output.preview) {
+        const completedHtml = completeHtml(output.preview);
         setState(prev => ({ 
           ...prev, 
           preview: completedHtml, 
+          files: output.files,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
@@ -311,6 +321,7 @@ export function useStreamingGeneration() {
         setState(prev => ({ 
           ...prev, 
           preview: wrappedHtml, 
+          files: [],
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
@@ -351,9 +362,14 @@ export function useStreamingGeneration() {
   };
 }
 
-// Extract and clean HTML from AI output
-function extractHtml(text: string): string {
-  if (!text) return "";
+// Extract JSON output with files and preview from AI output
+interface ExtractedOutput {
+  preview: string;
+  files: ProjectFile[];
+}
+
+function extractOutput(text: string): ExtractedOutput {
+  if (!text) return { preview: "", files: [] };
 
   let cleaned = text;
 
@@ -361,41 +377,80 @@ function extractHtml(text: string): string {
   cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, "");
   
   // Remove markdown code fences
-  cleaned = cleaned.replace(/```(?:html|typescript|tsx|jsx|javascript)?\s*/gi, "");
+  cleaned = cleaned.replace(/```(?:json|html|typescript|tsx|jsx|javascript)?\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
-  
-  // Try to extract preview from JSON output
-  const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)"\s*\}/);
-  if (previewMatch) {
-    // Unescape the JSON string
-    let htmlFromJson = previewMatch[1];
-    htmlFromJson = htmlFromJson.replace(/\\n/g, '\n');
-    htmlFromJson = htmlFromJson.replace(/\\"/g, '"');
-    htmlFromJson = htmlFromJson.replace(/\\\\/g, '\\');
-    if (htmlFromJson.includes("<!DOCTYPE html>")) {
-      cleaned = htmlFromJson;
-    }
-  }
   
   cleaned = cleaned.trim();
 
-  // Extract complete HTML document
+  // Try to parse as JSON with files array
+  try {
+    // Find the JSON object boundaries
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
+    
+    if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+      const jsonStr = cleaned.slice(jsonStart, jsonEnd + 1);
+      
+      // Parse the JSON
+      const parsed = JSON.parse(jsonStr);
+      
+      // Extract files array
+      let files: ProjectFile[] = [];
+      if (Array.isArray(parsed.files)) {
+        files = parsed.files
+          .filter((f: any) => f && typeof f.path === 'string' && typeof f.content === 'string')
+          .map((f: any) => ({
+            path: f.path,
+            content: f.content
+          }));
+      }
+      
+      // Extract preview HTML
+      let preview = "";
+      if (typeof parsed.preview === 'string') {
+        preview = parsed.preview
+          .replace(/\\n/g, '\n')
+          .replace(/\\"/g, '"')
+          .replace(/\\t/g, '\t')
+          .replace(/\\\\/g, '\\');
+      }
+      
+      if (files.length > 0 || preview.includes("<!DOCTYPE html>")) {
+        console.log(`Extracted ${files.length} files from JSON output`);
+        return { preview: preview || wrapInHtml("No preview available"), files };
+      }
+    }
+  } catch (e) {
+    console.log("JSON parse failed, falling back to HTML extraction:", e);
+  }
+
+  // Fallback: Try to extract preview from partial JSON
+  const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*[,}]|\s*$)/);
+  if (previewMatch) {
+    let htmlFromJson = previewMatch[1];
+    htmlFromJson = htmlFromJson.replace(/\\n/g, '\n');
+    htmlFromJson = htmlFromJson.replace(/\\"/g, '"');
+    htmlFromJson = htmlFromJson.replace(/\\t/g, '\t');
+    htmlFromJson = htmlFromJson.replace(/\\\\/g, '\\');
+    if (htmlFromJson.includes("<!DOCTYPE html>")) {
+      return { preview: htmlFromJson, files: [] };
+    }
+  }
+  
+  // Fallback: Extract raw HTML
   const docMatch = cleaned.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-  if (docMatch) return docMatch[0].trim();
+  if (docMatch) return { preview: docMatch[0].trim(), files: [] };
 
-  // Try without DOCTYPE
   const htmlMatch = cleaned.match(/<html[\s\S]*<\/html>/i);
-  if (htmlMatch) return "<!DOCTYPE html>\n" + htmlMatch[0].trim();
+  if (htmlMatch) return { preview: "<!DOCTYPE html>\n" + htmlMatch[0].trim(), files: [] };
 
-  // Return partial from DOCTYPE
   const partialIdx = cleaned.indexOf("<!DOCTYPE html>");
-  if (partialIdx !== -1) return cleaned.slice(partialIdx);
+  if (partialIdx !== -1) return { preview: cleaned.slice(partialIdx), files: [] };
 
-  // Try from <html>
   const htmlIdx = cleaned.indexOf("<html");
-  if (htmlIdx !== -1) return "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx);
+  if (htmlIdx !== -1) return { preview: "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx), files: [] };
 
-  return "";
+  return { preview: "", files: [] };
 }
 
 // Complete partial HTML
