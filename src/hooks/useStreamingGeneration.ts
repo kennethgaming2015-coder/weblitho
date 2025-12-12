@@ -80,6 +80,7 @@ export function useStreamingGeneration() {
     conversationHistory,
     onChunk,
     onComplete,
+    onConversation,
     onError,
   }: {
     prompt: string;
@@ -87,7 +88,8 @@ export function useStreamingGeneration() {
     model: string;
     conversationHistory: Array<{ role: string; content: string }>;
     onChunk?: (html: string) => void;
-    onComplete?: (html: string) => void;
+    onComplete?: (html: string, files: ProjectFile[]) => void;
+    onConversation?: (response: string) => void;
     onError?: (error: string) => void;
   }) => {
     // Reset state - start with isComplete: false
@@ -226,8 +228,8 @@ export function useStreamingGeneration() {
           progress: 100,
         }));
 
-        // Return conversation response through onComplete
-        onComplete?.(cleanedResponse);
+        // Return conversation response through dedicated callback
+        onConversation?.(cleanedResponse);
         return;
       }
 
@@ -302,7 +304,7 @@ export function useStreamingGeneration() {
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(output.preview);
+        onComplete?.(output.preview, output.files);
       } else if (output.preview) {
         const completedHtml = completeHtml(output.preview);
         setState(prev => ({ 
@@ -315,7 +317,7 @@ export function useStreamingGeneration() {
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(completedHtml);
+        onComplete?.(completedHtml, output.files);
       } else {
         const wrappedHtml = wrapInHtml(accumulatedTextRef.current.trim());
         setState(prev => ({ 
@@ -328,7 +330,7 @@ export function useStreamingGeneration() {
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(wrappedHtml);
+        onComplete?.(wrappedHtml, []);
       }
 
     } catch (err) {
