@@ -2,11 +2,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ChatHero } from "@/components/chat/ChatHero";
 import { ChatInterface } from "@/components/chat/ChatInterface";
-import { PreviewPanel } from "@/components/preview/PreviewPanel";
+import { EnhancedPreview } from "@/components/builder/EnhancedPreview";
 import { ModelType } from "@/components/builder/SettingsDialog";
 import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
 import { FileTree } from "@/components/builder/FileTree";
-import { CodeViewer } from "@/components/preview/CodeViewer";
+import { MonacoEditor } from "@/components/builder/MonacoEditor";
 import { ExportOptions } from "@/components/builder/ExportOptions";
 import { VersionHistory } from "@/components/builder/VersionHistory";
 import { TemplateGallery } from "@/components/builder/TemplateGallery";
@@ -696,47 +696,26 @@ const Index = () => {
             
             {/* Main Content Area */}
             <div className="flex-1 overflow-hidden">
-              {streaming.isGenerating ? (
+              {viewMode === "preview" ? (
                 <div className="h-full animate-fade-in">
-                  <PreviewPanel
+                  <EnhancedPreview
                     code={generatedContent?.preview || streaming.preview}
+                    files={generatedContent?.files}
+                    selectedFile={selectedFileView}
                     isGenerating={streaming.isGenerating}
                     isComplete={streaming.isComplete}
                     generationStatus={streaming.status}
                     generationProgress={streaming.progress}
-                    validation={null}
+                    validation={validation}
                   />
                 </div>
-              ) : generatedContent ? (
-                <div className="h-full animate-fade-in">
-                  {viewMode === "preview" ? (
-                    <PreviewPanel
-                      code={generatedContent.preview}
-                      metadata={generatedContent.metadata}
-                      isGenerating={false}
-                      isComplete={true}
-                      generationStatus=""
-                      validation={validation}
-                    />
-                  ) : (
-                    <CodeViewer 
-                      fileName={selectedFileView?.name || "index.html"} 
-                      content={selectedFileView?.content || generatedContent.preview}
-                      language={selectedFileView?.name?.split('.').pop() || "html"}
-                    />
-                  )}
-                </div>
               ) : (
-                <div className="h-full flex items-center justify-center animate-fade-in">
-                  <div className="text-center space-y-4">
-                    <div className="inline-flex items-center justify-center">
-                      <img src={weblithoLogo} alt="Weblitho" className="h-16 w-auto opacity-60" />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-lg font-medium text-foreground/80">Your creation will appear here</p>
-                      <p className="text-sm text-muted-foreground max-w-xs">Generate a website using the chat panel on the left</p>
-                    </div>
-                  </div>
+                <div className="h-full animate-fade-in">
+                  <MonacoEditor
+                    content={selectedFileView?.content || generatedContent?.preview || ""}
+                    fileName={selectedFileView?.name || "index.html"}
+                    readOnly
+                  />
                 </div>
               )}
             </div>
