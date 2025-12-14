@@ -6,14 +6,22 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Model mapping with capabilities - using stable model names
-const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string; requiresPaid: boolean; maxTokens: number }> = {
+// Model mapping with Lovable AI + fallback to OpenRouter
+const MODEL_MAPPING: Record<string, { provider: "lovable" | "openrouter" | "gemini"; model: string; requiresPaid: boolean; maxTokens: number }> = {
   "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false, maxTokens: 16000 },
-  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash", requiresPaid: true, maxTokens: 65536 },
-  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro", requiresPaid: true, maxTokens: 65536 },
+  "google/gemini-2.5-flash": { provider: "lovable", model: "google/gemini-2.5-flash", requiresPaid: true, maxTokens: 65536 },
+  "google/gemini-2.5-pro": { provider: "lovable", model: "google/gemini-2.5-pro", requiresPaid: true, maxTokens: 65536 },
 };
 
 const isPaidPlan = (plan: string): boolean => plan === 'pro' || plan === 'business' || plan === 'owner';
+
+// Simple in-memory cache for recent requests
+const requestCache = new Map<string, { response: string; timestamp: number }>();
+const CACHE_TTL = 60000; // 1 minute
+
+function getCacheKey(prompt: string, model: string, hasCode: boolean): string {
+  return `${prompt.slice(0, 100)}-${model}-${hasCode}`;
+}
 
 // =============================================
 // INTENT DETECTION - Understand what user wants
@@ -287,6 +295,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+
   try {
     const { prompt, conversationHistory = [], currentCode = null, model = "deepseek-free" } = await req.json();
 
@@ -333,7 +343,7 @@ serve(async (req) => {
         .from("user_credits")
         .select("plan, is_unlimited")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
       if (!credits || (!isPaidPlan(credits.plan) && !credits.is_unlimited)) {
         return new Response(
@@ -351,7 +361,7 @@ serve(async (req) => {
     // Handle CONVERSATION intent - discuss instead of generate
     if (intent.type === "conversation") {
       console.log("=== CONVERSATION MODE ===");
-      return await handleConversation(modelConfig, prompt, conversationHistory, currentCode, isModification);
+      return await handleConversation(prompt, conversationHistory, currentCode, isModification);
     }
     
     // Build conversation context with memory
@@ -370,15 +380,33 @@ serve(async (req) => {
     console.log("Provider:", modelConfig.provider);
     console.log("Mode:", isModification ? intent.type.toUpperCase() : "NEW");
 
-    // Call the AI provider with enhanced context
-    if (modelConfig.provider === "openrouter") {
-      return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
-    } else {
-      return await callGemini(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
+    // Call the AI provider with retry logic
+    let lastError: Error | null = null;
+    const maxRetries = 2;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (modelConfig.provider === "lovable") {
+          return await callLovableAI(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
+        } else if (modelConfig.provider === "openrouter") {
+          return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
+        } else {
+          return await callGemini(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
+        }
+      } catch (err) {
+        lastError = err as Error;
+        console.error(`Attempt ${attempt + 1} failed:`, err);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Exponential backoff
+        }
+      }
     }
 
+    throw lastError || new Error("All retry attempts failed");
+
   } catch (e) {
-    console.error("Generate-page error:", e);
+    const duration = Date.now() - startTime;
+    console.error(`Generate-page error after ${duration}ms:`, e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Generation failed. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -387,7 +415,78 @@ serve(async (req) => {
 });
 
 // =============================================
-// OpenRouter API Call
+// Lovable AI Gateway (Primary for premium models)
+// =============================================
+async function callLovableAI(
+  modelConfig: { model: string; maxTokens: number },
+  systemPrompt: string,
+  userPrompt: string,
+  conversationHistory: Array<{ role: string; content: string }>
+) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    console.log("LOVABLE_API_KEY not found, falling back to Gemini");
+    return await callGemini(modelConfig, systemPrompt, userPrompt, conversationHistory);
+  }
+
+  const messages = [
+    { role: "system", content: systemPrompt },
+    ...conversationHistory.slice(-6).map(m => ({ role: m.role, content: m.content })),
+    { role: "user", content: userPrompt }
+  ];
+
+  console.log("Calling Lovable AI Gateway with model:", modelConfig.model);
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: modelConfig.model,
+      messages,
+      stream: true,
+      max_tokens: modelConfig.maxTokens,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Lovable AI error:", response.status, errorText);
+    
+    if (response.status === 429) {
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (response.status === 402) {
+      return new Response(
+        JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Fallback to Gemini if Lovable AI fails
+    console.log("Lovable AI failed, falling back to Gemini");
+    return await callGemini(modelConfig, systemPrompt, userPrompt, conversationHistory);
+  }
+
+  console.log("Lovable AI streaming started");
+  return new Response(response.body, {
+    headers: { 
+      ...corsHeaders, 
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+    },
+  });
+}
+
+// =============================================
+// OpenRouter API Call (Free model fallback)
 // =============================================
 async function callOpenRouter(
   modelConfig: { model: string; maxTokens: number },
@@ -565,7 +664,6 @@ async function callGemini(
 // CONVERSATION MODE - Chat without generating
 // =============================================
 async function handleConversation(
-  modelConfig: { model: string; maxTokens: number; provider: string },
   userPrompt: string,
   conversationHistory: Array<{ role: string; content: string }>,
   currentCode: string | null,
@@ -573,32 +671,54 @@ async function handleConversation(
 ) {
   const conversationSystemPrompt = buildConversationSystemPrompt(currentCode, hasExistingProject);
   
-  // Use OpenRouter for conversation (free model)
-  const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
-  if (!OPENROUTER_KEY) throw new Error("OPENROUTER_KEY not configured");
-
+  // Use Lovable AI for conversation if available
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
   const messages = [
     { role: "system", content: conversationSystemPrompt },
     ...conversationHistory.slice(-10),
     { role: "user", content: userPrompt }
   ];
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_KEY}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://weblitho.app",
-      "X-Title": "Weblitho AI",
-    },
-    body: JSON.stringify({
-      model: "tngtech/deepseek-r1t2-chimera:free",
-      messages,
-      stream: true,
-      max_tokens: 2000, // Shorter for conversation
-      temperature: 0.8,
-    }),
-  });
+  let response: Response;
+
+  if (LOVABLE_API_KEY) {
+    console.log("Using Lovable AI for conversation");
+    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages,
+        stream: true,
+        max_tokens: 2000,
+      }),
+    });
+  } else {
+    const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
+    if (!OPENROUTER_KEY) throw new Error("No AI API keys configured");
+
+    console.log("Using OpenRouter for conversation");
+    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://weblitho.app",
+        "X-Title": "Weblitho AI",
+      },
+      body: JSON.stringify({
+        model: "tngtech/deepseek-r1t2-chimera:free",
+        messages,
+        stream: true,
+        max_tokens: 2000,
+        temperature: 0.8,
+      }),
+    });
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -614,7 +734,7 @@ async function handleConversation(
     headers: { 
       ...corsHeaders, 
       "Content-Type": "text/event-stream",
-      "X-Response-Type": "conversation", // Frontend can use this
+      "X-Response-Type": "conversation",
       "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
     },
@@ -623,7 +743,7 @@ async function handleConversation(
 
 function buildConversationSystemPrompt(currentCode: string | null, hasExistingProject: boolean): string {
   const projectContext = hasExistingProject 
-    ? `\n\nThe user has an existing website project. You can discuss modifications, improvements, or answer questions about it. The current code is available for reference.`
+    ? `\n\nThe user has an existing website project. You can discuss modifications, improvements, or answer questions about it.`
     : `\n\nThe user hasn't started building yet. Help them plan their website by discussing their needs, goals, and preferences.`;
 
   return `You are Weblitho, a friendly AI assistant for website building. You're having a conversation with the user - NOT generating code right now.
@@ -652,9 +772,6 @@ You: "Great question! Looking at your current site, here are some ideas: I could
 User: "I'm not sure what kind of website I need"
 You: "Let me help you figure that out! What's the main purpose - are you showcasing your work (portfolio), selling something (e-commerce), promoting a business (landing page), or something else?"
 
-User: "Should I add more sections?"
-You: "It depends on your goals! A testimonials section builds trust, a FAQ reduces support questions, and a pricing table helps with conversions. What's most important for your visitors?"
-
 Remember: You're here to DISCUSS and HELP PLAN, not to generate code. Keep it conversational!`;
 }
 
@@ -675,7 +792,6 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
       ? `\n\nUser prefers ${context.projectContext.colorScheme} color scheme based on earlier conversation.`
       : "";
 
-  // Include conversation memory if available
   const memoryContext = context?.summary 
     ? `\n\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to maintain consistency with previous discussions.`
     : "";
@@ -714,100 +830,6 @@ ${websiteTypeContext}
 ${sectionsContext}
 ${styleContext}
 
-## REQUIRED PROJECT STRUCTURE
-Generate these files (minimum):
-
-### app/layout.tsx
-\`\`\`tsx
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'Website Title',
-  description: 'Website description',
-}
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
-    </html>
-  )
-}
-\`\`\`
-
-### app/page.tsx
-\`\`\`tsx
-import Navbar from '@/components/Navbar'
-import Hero from '@/components/Hero'
-import Features from '@/components/Features'
-import CTA from '@/components/CTA'
-import Footer from '@/components/Footer'
-
-export default function Home() {
-  return (
-    <main>
-      <Navbar />
-      <Hero />
-      <Features />
-      <CTA />
-      <Footer />
-    </main>
-  )
-}
-\`\`\`
-
-### app/globals.css
-\`\`\`css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  /* Add more CSS variables */
-}
-
-.dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-}
-\`\`\`
-
-### components/Navbar.tsx
-\`\`\`tsx
-'use client'
-import Link from 'next/link'
-import { useState } from 'react'
-
-export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false)
-  return (
-    <nav className="...">
-      {/* Navbar content */}
-    </nav>
-  )
-}
-\`\`\`
-
-### components/Hero.tsx
-\`\`\`tsx
-export default function Hero() {
-  return (
-    <section className="...">
-      {/* Hero content */}
-    </section>
-  )
-}
-\`\`\`
-
-### components/Features.tsx, components/CTA.tsx, components/Footer.tsx
-(Similar pattern - each component in its own file)
-
 ## DESIGN SYSTEM
 **Colors (Dark Theme Default)**: 
 - Background: slate-950, slate-900
@@ -832,36 +854,6 @@ export default function Hero() {
 - Shadows: shadow-2xl shadow-cyan-500/20
 - Animations: hover:scale-105 transition-all duration-300
 
-## PREVIEW HTML TEMPLATE
-The "preview" field should be a self-contained HTML that renders the same design:
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Preview</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'sans-serif'] },
-        }
-      }
-    }
-  </script>
-  <style>
-    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  </style>
-</head>
-<body class="bg-slate-950 text-white font-sans antialiased">
-  <!-- All sections inline for preview -->
-</body>
-</html>
-
 ## QUALITY REQUIREMENTS
 1. ✅ Fully responsive (mobile-first)
 2. ✅ Semantic HTML (header, main, section, footer)
@@ -877,13 +869,9 @@ The "preview" field should be a self-contained HTML that renders the same design
 Generate the complete multi-file project JSON now.`;
 }
 
-// =============================================
-// MULTI-FILE MODIFICATION PROMPT
-// =============================================
 function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const intentInstructions = getModificationInstructions(intent);
   
-  // Include conversation memory for better modifications
   const memoryContext = context?.summary 
     ? `\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to understand what the user has been building and maintain consistency.`
     : "";
@@ -927,145 +915,31 @@ ${currentCode}
 3. Keep all imports and component relationships intact
 4. Maintain design consistency and visual quality
 5. Ensure all files remain valid TypeScript/React
-6. ${intent.type === "add_section" ? "Add the new component file and import it in page.tsx" : ""}
-7. ${intent.type === "change_style" ? "Apply style changes consistently across all affected components" : ""}
-8. Remember context from previous conversations
 
 Return the complete modified project JSON now.`;
 }
 
-// =============================================
-// Website Type Context
-// =============================================
 function getWebsiteTypeContext(type: string): string {
   const contexts: Record<string, string> = {
-    saas: `
-This is a SaaS/Software product website. Include these components:
-- Navbar.tsx: Logo, nav links, CTA button
-- Hero.tsx: Value proposition with product screenshot/mockup
-- Features.tsx: Features grid (6 items minimum)
-- Pricing.tsx: Pricing tiers (Free, Pro, Enterprise)
-- Testimonials.tsx: Customer reviews with avatars
-- CTA.tsx: Final call-to-action
-- Footer.tsx: Links, social, copyright
-Focus on: Trust, clarity, conversion`,
-
-    landing: `
-This is a landing page. Include these components:
-- Navbar.tsx: Minimal navigation
-- Hero.tsx: Strong headline, subheadline, CTA
-- Features.tsx: Key benefits (3-4 items)
-- SocialProof.tsx: Logos, testimonials, stats
-- CTA.tsx: Single clear call-to-action
-- Footer.tsx: Minimal footer
-Focus on: Conversion, clarity, urgency`,
-
-    portfolio: `
-This is a portfolio/personal website. Include these components:
-- Navbar.tsx: Name, nav links
-- Hero.tsx: Name, title, intro
-- Projects.tsx: Work showcase grid
-- About.tsx: Bio, skills, experience
-- Contact.tsx: Contact form or info
-- Footer.tsx: Social links
-Focus on: Personality, work quality, credibility`,
-
-    ecommerce: `
-This is an e-commerce website. Include these components:
-- Navbar.tsx: Logo, search, cart icon
-- Hero.tsx: Featured product/offer
-- ProductGrid.tsx: Product cards
-- Categories.tsx: Category navigation
-- Testimonials.tsx: Customer reviews
-- Footer.tsx: Shipping, support, legal
-Focus on: Trust, product appeal, easy navigation`,
-
-    agency: `
-This is an agency/studio website. Include these components:
-- Navbar.tsx: Logo, services, contact
-- Hero.tsx: Bold tagline, showreel/visual
-- Services.tsx: Capabilities grid
-- Work.tsx: Case studies/portfolio
-- Team.tsx: Team members
-- Contact.tsx: Contact form
-- Footer.tsx: Full footer
-Focus on: Expertise, creativity, results`,
-
-    startup: `
-This is a startup/launch page. Include these components:
-- Navbar.tsx: Logo, waitlist CTA
-- Hero.tsx: Vision statement, signup
-- Problem.tsx: Problem/solution narrative
-- Features.tsx: What you're building
-- Team.tsx: Founders/team
-- CTA.tsx: Waitlist/early access
-- Footer.tsx: Minimal footer
-Focus on: Vision, excitement, early adoption`,
-
-    crypto: `
-This is a crypto/Web3 website. Include these components:
-- Navbar.tsx: Logo, connect wallet
-- Hero.tsx: Protocol value prop, stats
-- Features.tsx: Protocol features
-- HowItWorks.tsx: Step-by-step
-- Tokenomics.tsx: Token info
-- Community.tsx: Discord, Twitter links
-- Footer.tsx: Links, audit badges
-Focus on: Innovation, security, community`,
+    saas: `This is a SaaS/Software product website. Include: Navbar, Hero, Features, Pricing, Testimonials, CTA, Footer.`,
+    landing: `This is a landing page. Include: Navbar, Hero, Features, SocialProof, CTA, Footer.`,
+    portfolio: `This is a portfolio/personal website. Include: Navbar, Hero, Projects, About, Contact, Footer.`,
+    ecommerce: `This is an e-commerce website. Include: Navbar, Hero, ProductGrid, Categories, Testimonials, Footer.`,
+    agency: `This is an agency/studio website. Include: Navbar, Hero, Services, Work, Team, Contact, Footer.`,
+    startup: `This is a startup/launch page. Include: Navbar, Hero, Problem, Features, Team, CTA, Footer.`,
   };
   
   return contexts[type] || "";
 }
 
-// =============================================
-// Modification Instructions by Intent Type
-// =============================================
 function getModificationInstructions(intent: Intent): string {
   const instructions: Record<string, string> = {
-    fix: `
-FIXING MODE:
-- Carefully analyze all files for the reported issue
-- Look for syntax errors, missing imports, or broken components
-- Fix the issue while preserving all other code
-- Ensure all imports are correct`,
-
-    enhance: `
-ENHANCEMENT MODE:
-- Improve visual quality and polish across all components
-- Add subtle animations and micro-interactions
-- Enhance typography and spacing
-- Make colors more vibrant and consistent
-- Do NOT change the fundamental structure`,
-
-    add_section: `
-ADD SECTION MODE:
-- Create a new component file for the section
-- Add the import to page.tsx
-- Match the existing design system exactly
-- Use consistent spacing (py-24 md:py-32)
-- Ensure smooth transitions between sections`,
-
-    change_style: `
-STYLE CHANGE MODE:
-- Apply the style changes across all affected components
-- Update Tailwind classes consistently
-- Maintain visual coherence
-- Keep accessibility in mind (contrast ratios)
-- Update globals.css if needed`,
-
-    change_content: `
-CONTENT CHANGE MODE:
-- Update only the specified text/content
-- Keep formatting and structure intact
-- Maintain professional copywriting quality
-- Ensure content fits the design`,
-
-    modify: `
-MODIFICATION MODE:
-- Make the specific changes requested
-- Update only necessary files
-- Preserve everything not being changed
-- Maintain design quality and consistency`,
+    fix: `FIXING MODE: Carefully analyze all files for the reported issue and fix it while preserving all other code.`,
+    enhance: `ENHANCEMENT MODE: Improve visual quality, add animations, enhance typography. Do NOT change fundamental structure.`,
+    add_section: `ADD SECTION MODE: Create a new component file and add the import to page.tsx. Match the existing design system.`,
+    change_style: `STYLE CHANGE MODE: Apply the style changes across all affected components consistently.`,
+    change_content: `CONTENT CHANGE MODE: Update only the specified text/content. Keep formatting intact.`,
+    modify: `MODIFICATION MODE: Make the specific changes requested. Preserve everything not being changed.`,
   };
   
   return instructions[intent.type] || instructions.modify;
