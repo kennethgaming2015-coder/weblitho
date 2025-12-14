@@ -6,25 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Model mapping with Lovable AI + fallback to OpenRouter
-const MODEL_MAPPING: Record<string, { provider: "lovable" | "openrouter" | "gemini"; model: string; requiresPaid: boolean; maxTokens: number }> = {
+// Model mapping - OpenRouter for free, Gemini for premium
+const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string; requiresPaid: boolean; maxTokens: number }> = {
   "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false, maxTokens: 16000 },
-  "google/gemini-2.5-flash": { provider: "lovable", model: "google/gemini-2.5-flash", requiresPaid: true, maxTokens: 65536 },
-  "google/gemini-2.5-pro": { provider: "lovable", model: "google/gemini-2.5-pro", requiresPaid: true, maxTokens: 65536 },
+  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash", requiresPaid: true, maxTokens: 65536 },
+  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro", requiresPaid: true, maxTokens: 65536 },
 };
 
 const isPaidPlan = (plan: string): boolean => plan === 'pro' || plan === 'business' || plan === 'owner';
 
-// Simple in-memory cache for recent requests
-const requestCache = new Map<string, { response: string; timestamp: number }>();
-const CACHE_TTL = 60000; // 1 minute
-
-function getCacheKey(prompt: string, model: string, hasCode: boolean): string {
-  return `${prompt.slice(0, 100)}-${model}-${hasCode}`;
-}
-
 // =============================================
-// INTENT DETECTION - Understand what user wants
+// INTENT DETECTION
 // =============================================
 interface Intent {
   type: "new" | "modify" | "fix" | "enhance" | "add_section" | "change_style" | "change_content" | "conversation";
@@ -32,14 +24,12 @@ interface Intent {
   websiteType?: string;
   sections?: string[];
   styleChanges?: string[];
-  contentChanges?: string[];
   isQuestion?: boolean;
 }
 
 function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
   const lowerPrompt = prompt.toLowerCase().trim();
   
-  // CONVERSATION DETECTION - Check if user is asking a question or wants to discuss
   const questionPatterns = [
     /^what\s+(can|should|would|could|do)/i,
     /^how\s+(can|should|would|could|do)/i,
@@ -73,16 +63,10 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
   const isQuestion = questionPatterns.some(p => p.test(lowerPrompt));
   const isConversational = conversationKeywords.some(k => lowerPrompt.includes(k));
   
-  // If it's clearly a question or conversational, return conversation intent
   if ((isQuestion || isConversational) && !lowerPrompt.includes("create") && !lowerPrompt.includes("build") && !lowerPrompt.includes("generate") && !lowerPrompt.includes("make me")) {
-    return {
-      type: "conversation",
-      confidence: 0.9,
-      isQuestion: true,
-    };
+    return { type: "conversation", confidence: 0.9, isQuestion: true };
   }
   
-  // Keywords for different intents
   const modifyKeywords = ["change", "update", "modify", "edit", "make it", "switch", "replace"];
   const fixKeywords = ["fix", "bug", "error", "broken", "not working", "issue", "problem"];
   const enhanceKeywords = ["improve", "enhance", "better", "optimize", "upgrade", "polish"];
@@ -90,7 +74,6 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
   const styleKeywords = ["color", "font", "style", "theme", "dark", "light", "spacing", "size", "animation", "hover"];
   const contentKeywords = ["text", "copy", "heading", "title", "description", "image", "logo", "name"];
   
-  // Website type detection
   const websiteTypes: Record<string, string[]> = {
     "saas": ["saas", "software", "app", "platform", "dashboard", "subscription"],
     "landing": ["landing", "landing page", "homepage", "hero"],
@@ -100,11 +83,8 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
     "blog": ["blog", "article", "post", "news", "magazine"],
     "startup": ["startup", "launch", "coming soon", "waitlist", "beta"],
     "crypto": ["crypto", "web3", "blockchain", "nft", "defi", "token"],
-    "restaurant": ["restaurant", "food", "menu", "cafe", "dining"],
-    "fitness": ["fitness", "gym", "workout", "health", "wellness"],
   };
   
-  // Section detection
   const sectionTypes: Record<string, string[]> = {
     "hero": ["hero", "banner", "header section", "main section"],
     "features": ["features", "benefits", "what we offer", "services"],
@@ -120,56 +100,32 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
     "navbar": ["navbar", "navigation", "menu", "header"],
   };
   
-  // Detect intent type
   let type: Intent["type"] = "new";
   let confidence = 0.5;
   
   if (hasExistingCode) {
-    if (fixKeywords.some(k => lowerPrompt.includes(k))) {
-      type = "fix";
-      confidence = 0.9;
-    } else if (enhanceKeywords.some(k => lowerPrompt.includes(k))) {
-      type = "enhance";
-      confidence = 0.85;
-    } else if (addKeywords.some(k => lowerPrompt.includes(k))) {
-      type = "add_section";
-      confidence = 0.85;
-    } else if (styleKeywords.some(k => lowerPrompt.includes(k))) {
-      type = "change_style";
-      confidence = 0.8;
-    } else if (contentKeywords.some(k => lowerPrompt.includes(k))) {
-      type = "change_content";
-      confidence = 0.8;
-    } else if (modifyKeywords.some(k => lowerPrompt.includes(k))) {
-      type = "modify";
-      confidence = 0.75;
-    } else {
-      type = "modify";
-      confidence = 0.6;
-    }
+    if (fixKeywords.some(k => lowerPrompt.includes(k))) { type = "fix"; confidence = 0.9; }
+    else if (enhanceKeywords.some(k => lowerPrompt.includes(k))) { type = "enhance"; confidence = 0.85; }
+    else if (addKeywords.some(k => lowerPrompt.includes(k))) { type = "add_section"; confidence = 0.85; }
+    else if (styleKeywords.some(k => lowerPrompt.includes(k))) { type = "change_style"; confidence = 0.8; }
+    else if (contentKeywords.some(k => lowerPrompt.includes(k))) { type = "change_content"; confidence = 0.8; }
+    else if (modifyKeywords.some(k => lowerPrompt.includes(k))) { type = "modify"; confidence = 0.75; }
+    else { type = "modify"; confidence = 0.6; }
   } else {
     type = "new";
     confidence = 0.9;
   }
   
-  // Detect website type
   let websiteType: string | undefined;
   for (const [typeKey, keywords] of Object.entries(websiteTypes)) {
-    if (keywords.some(k => lowerPrompt.includes(k))) {
-      websiteType = typeKey;
-      break;
-    }
+    if (keywords.some(k => lowerPrompt.includes(k))) { websiteType = typeKey; break; }
   }
   
-  // Detect requested sections
   const sections: string[] = [];
   for (const [section, keywords] of Object.entries(sectionTypes)) {
-    if (keywords.some(k => lowerPrompt.includes(k))) {
-      sections.push(section);
-    }
+    if (keywords.some(k => lowerPrompt.includes(k))) { sections.push(section); }
   }
   
-  // Detect style changes
   const styleChanges: string[] = [];
   if (lowerPrompt.includes("dark")) styleChanges.push("dark theme");
   if (lowerPrompt.includes("light")) styleChanges.push("light theme");
@@ -189,12 +145,11 @@ function detectIntent(prompt: string, hasExistingCode: boolean): Intent {
 }
 
 // =============================================
-// CONVERSATION MEMORY - Summarize & Compress
+// CONVERSATION MEMORY
 // =============================================
 interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
-  timestamp?: number;
 }
 
 interface ConversationContext {
@@ -203,7 +158,6 @@ interface ConversationContext {
   projectContext: {
     websiteType?: string;
     colorScheme?: string;
-    sections?: string[];
     modifications?: string[];
   };
 }
@@ -216,86 +170,41 @@ function buildConversationContext(
   const projectContext: ConversationContext["projectContext"] = {};
   const modifications: string[] = [];
   
-  // Extract context from conversation history
   for (const msg of conversationHistory) {
     const lower = msg.content.toLowerCase();
-    
-    // Detect website type mentions
     if (lower.includes("saas") || lower.includes("software")) projectContext.websiteType = "saas";
     else if (lower.includes("portfolio")) projectContext.websiteType = "portfolio";
     else if (lower.includes("ecommerce") || lower.includes("shop")) projectContext.websiteType = "ecommerce";
     else if (lower.includes("agency")) projectContext.websiteType = "agency";
     else if (lower.includes("landing")) projectContext.websiteType = "landing";
     
-    // Detect color preferences
     if (lower.includes("dark theme") || lower.includes("dark mode")) projectContext.colorScheme = "dark";
     if (lower.includes("blue")) projectContext.colorScheme = "blue";
     if (lower.includes("purple")) projectContext.colorScheme = "purple";
     if (lower.includes("cyan") || lower.includes("teal")) projectContext.colorScheme = "cyan";
     
-    // Track modifications from assistant messages (they describe what was done)
     if (msg.role === "assistant" && msg.content.length < 200) {
       modifications.push(msg.content);
     }
   }
   
-  projectContext.modifications = modifications.slice(-5); // Keep last 5 modifications
-  
-  // Build summary of conversation
-  const summary = buildConversationSummary(conversationHistory, projectContext);
-  
-  // Keep only recent messages for context (last 4 exchanges)
-  const recentMessages = conversationHistory.slice(-8);
-  
-  return {
-    summary,
-    recentMessages,
-    projectContext,
-  };
-}
-
-function buildConversationSummary(
-  history: ConversationMessage[],
-  projectContext: ConversationContext["projectContext"]
-): string {
-  if (history.length === 0) return "";
+  projectContext.modifications = modifications.slice(-5);
   
   const parts: string[] = [];
+  if (projectContext.websiteType) parts.push(`This is a ${projectContext.websiteType} website project.`);
+  if (projectContext.colorScheme) parts.push(`User prefers ${projectContext.colorScheme} color scheme.`);
   
-  // Add website type context
-  if (projectContext.websiteType) {
-    parts.push(`This is a ${projectContext.websiteType} website project.`);
-  }
-  
-  // Add color scheme
-  if (projectContext.colorScheme) {
-    parts.push(`User prefers ${projectContext.colorScheme} color scheme.`);
-  }
-  
-  // Summarize what's been built
-  const userRequests = history
-    .filter(m => m.role === "user")
-    .map(m => m.content.slice(0, 100))
-    .slice(-5);
-  
-  if (userRequests.length > 1) {
-    parts.push(`Previous requests: ${userRequests.join(" → ")}`);
-  }
-  
-  // Add recent modifications
-  if (projectContext.modifications && projectContext.modifications.length > 0) {
-    parts.push(`Recent changes: ${projectContext.modifications.join(", ")}`);
-  }
-  
-  return parts.join(" ");
+  return {
+    summary: parts.join(" "),
+    recentMessages: conversationHistory.slice(-8),
+    projectContext,
+  };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
-
-  const startTime = Date.now();
 
   try {
     const { prompt, conversationHistory = [], currentCode = null, model = "deepseek-free" } = await req.json();
@@ -304,7 +213,6 @@ serve(async (req) => {
     console.log("Model:", model);
     console.log("Prompt:", prompt?.slice(0, 100) + "...");
     console.log("Has existing code:", !!currentCode);
-    console.log("Conversation history length:", conversationHistory.length);
 
     if (!prompt || typeof prompt !== 'string') {
       return new Response(
@@ -353,26 +261,19 @@ serve(async (req) => {
       }
     }
 
-    // Detect intent
     const isModification = currentCode !== null && currentCode.length > 100;
     const intent = detectIntent(prompt, isModification);
     console.log("Intent detected:", JSON.stringify(intent));
     
-    // Handle CONVERSATION intent - discuss instead of generate
+    // Handle CONVERSATION intent
     if (intent.type === "conversation") {
       console.log("=== CONVERSATION MODE ===");
       return await handleConversation(prompt, conversationHistory, currentCode, isModification);
     }
     
-    // Build conversation context with memory
     const conversationContext = buildConversationContext(conversationHistory, currentCode, prompt);
-    console.log("Conversation context:", JSON.stringify({
-      summaryLength: conversationContext.summary.length,
-      recentMessagesCount: conversationContext.recentMessages.length,
-      projectContext: conversationContext.projectContext,
-    }));
     
-    // Build context-aware system prompt with conversation memory
+    // Build system prompt with STRONG multi-file instructions
     const systemPrompt = isModification 
       ? buildModificationPrompt(currentCode, intent, prompt, conversationContext) 
       : buildGenerationPrompt(intent, prompt, conversationContext);
@@ -380,33 +281,14 @@ serve(async (req) => {
     console.log("Provider:", modelConfig.provider);
     console.log("Mode:", isModification ? intent.type.toUpperCase() : "NEW");
 
-    // Call the AI provider with retry logic
-    let lastError: Error | null = null;
-    const maxRetries = 2;
-    
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        if (modelConfig.provider === "lovable") {
-          return await callLovableAI(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
-        } else if (modelConfig.provider === "openrouter") {
-          return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
-        } else {
-          return await callGemini(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
-        }
-      } catch (err) {
-        lastError = err as Error;
-        console.error(`Attempt ${attempt + 1} failed:`, err);
-        if (attempt < maxRetries) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Exponential backoff
-        }
-      }
+    if (modelConfig.provider === "openrouter") {
+      return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
+    } else {
+      return await callGemini(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
     }
 
-    throw lastError || new Error("All retry attempts failed");
-
   } catch (e) {
-    const duration = Date.now() - startTime;
-    console.error(`Generate-page error after ${duration}ms:`, e);
+    console.error("Generate-page error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Generation failed. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -415,78 +297,7 @@ serve(async (req) => {
 });
 
 // =============================================
-// Lovable AI Gateway (Primary for premium models)
-// =============================================
-async function callLovableAI(
-  modelConfig: { model: string; maxTokens: number },
-  systemPrompt: string,
-  userPrompt: string,
-  conversationHistory: Array<{ role: string; content: string }>
-) {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.log("LOVABLE_API_KEY not found, falling back to Gemini");
-    return await callGemini(modelConfig, systemPrompt, userPrompt, conversationHistory);
-  }
-
-  const messages = [
-    { role: "system", content: systemPrompt },
-    ...conversationHistory.slice(-6).map(m => ({ role: m.role, content: m.content })),
-    { role: "user", content: userPrompt }
-  ];
-
-  console.log("Calling Lovable AI Gateway with model:", modelConfig.model);
-
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: modelConfig.model,
-      messages,
-      stream: true,
-      max_tokens: modelConfig.maxTokens,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Lovable AI error:", response.status, errorText);
-    
-    if (response.status === 429) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    if (response.status === 402) {
-      return new Response(
-        JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    // Fallback to Gemini if Lovable AI fails
-    console.log("Lovable AI failed, falling back to Gemini");
-    return await callGemini(modelConfig, systemPrompt, userPrompt, conversationHistory);
-  }
-
-  console.log("Lovable AI streaming started");
-  return new Response(response.body, {
-    headers: { 
-      ...corsHeaders, 
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
-    },
-  });
-}
-
-// =============================================
-// OpenRouter API Call (Free model fallback)
+// OpenRouter API Call
 // =============================================
 async function callOpenRouter(
   modelConfig: { model: string; maxTokens: number },
@@ -549,7 +360,7 @@ async function callOpenRouter(
 }
 
 // =============================================
-// Gemini API Call with SSE transformation
+// Gemini API Call
 // =============================================
 async function callGemini(
   modelConfig: { model: string; maxTokens: number },
@@ -604,7 +415,6 @@ async function callGemini(
 
   console.log("Gemini streaming started");
 
-  // Transform Gemini SSE to OpenAI-compatible format
   const transformedStream = new ReadableStream({
     async start(controller) {
       const reader = response.body!.getReader();
@@ -661,7 +471,7 @@ async function callGemini(
 }
 
 // =============================================
-// CONVERSATION MODE - Chat without generating
+// CONVERSATION MODE
 // =============================================
 async function handleConversation(
   userPrompt: string,
@@ -669,56 +479,53 @@ async function handleConversation(
   currentCode: string | null,
   hasExistingProject: boolean
 ) {
-  const conversationSystemPrompt = buildConversationSystemPrompt(currentCode, hasExistingProject);
-  
-  // Use Lovable AI for conversation if available
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  
+  const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
+  if (!OPENROUTER_KEY) throw new Error("OPENROUTER_KEY not configured");
+
+  const projectContext = hasExistingProject 
+    ? `The user has an existing website project. Discuss modifications or improvements.`
+    : `The user hasn't started building yet. Help them plan their website.`;
+
+  const systemPrompt = `You are Weblitho, a friendly AI assistant for website building. You're having a conversation - NOT generating code.
+
+YOUR ROLE:
+- Have a natural conversation to understand what the user wants
+- Ask clarifying questions when needed
+- Suggest ideas and possibilities
+- Help users make decisions about their website
+
+${projectContext}
+
+GUIDELINES:
+1. Be helpful, friendly, and concise
+2. Ask ONE question at a time
+3. NEVER output code or JSON - this is a discussion only
+4. Keep responses short (2-4 sentences)
+
+Remember: You're here to DISCUSS, not to generate code.`;
+
   const messages = [
-    { role: "system", content: conversationSystemPrompt },
+    { role: "system", content: systemPrompt },
     ...conversationHistory.slice(-10),
     { role: "user", content: userPrompt }
   ];
 
-  let response: Response;
-
-  if (LOVABLE_API_KEY) {
-    console.log("Using Lovable AI for conversation");
-    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages,
-        stream: true,
-        max_tokens: 2000,
-      }),
-    });
-  } else {
-    const OPENROUTER_KEY = Deno.env.get("OPENROUTER_KEY");
-    if (!OPENROUTER_KEY) throw new Error("No AI API keys configured");
-
-    console.log("Using OpenRouter for conversation");
-    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://weblitho.app",
-        "X-Title": "Weblitho AI",
-      },
-      body: JSON.stringify({
-        model: "tngtech/deepseek-r1t2-chimera:free",
-        messages,
-        stream: true,
-        max_tokens: 2000,
-        temperature: 0.8,
-      }),
-    });
-  }
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://weblitho.app",
+      "X-Title": "Weblitho AI",
+    },
+    body: JSON.stringify({
+      model: "tngtech/deepseek-r1t2-chimera:free",
+      messages,
+      stream: true,
+      max_tokens: 2000,
+      temperature: 0.8,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -729,7 +536,6 @@ async function handleConversation(
     );
   }
 
-  // Return with special header to indicate this is a conversation response
   return new Response(response.body, {
     headers: { 
       ...corsHeaders, 
@@ -741,156 +547,111 @@ async function handleConversation(
   });
 }
 
-function buildConversationSystemPrompt(currentCode: string | null, hasExistingProject: boolean): string {
-  const projectContext = hasExistingProject 
-    ? `\n\nThe user has an existing website project. You can discuss modifications, improvements, or answer questions about it.`
-    : `\n\nThe user hasn't started building yet. Help them plan their website by discussing their needs, goals, and preferences.`;
-
-  return `You are Weblitho, a friendly AI assistant for website building. You're having a conversation with the user - NOT generating code right now.
-
-## YOUR ROLE
-- Have a natural conversation to understand what the user wants
-- Ask clarifying questions when needed
-- Suggest ideas and possibilities
-- Help users make decisions about their website
-- Provide guidance on design, features, and best practices
-${projectContext}
-
-## CONVERSATION GUIDELINES
-1. Be helpful, friendly, and concise
-2. Ask ONE question at a time to understand needs
-3. Suggest specific options when relevant (e.g., "Would you like a dark or light theme?")
-4. When ready to build, tell the user to describe what they want to create
-5. NEVER output code or JSON - this is a discussion only
-6. Keep responses short (2-4 sentences typically)
-
-## EXAMPLE RESPONSES
-
-User: "What can we change?"
-You: "Great question! Looking at your current site, here are some ideas: I could enhance the hero section with more animations, add a testimonials section for social proof, or change the color scheme. What sounds most interesting to you?"
-
-User: "I'm not sure what kind of website I need"
-You: "Let me help you figure that out! What's the main purpose - are you showcasing your work (portfolio), selling something (e-commerce), promoting a business (landing page), or something else?"
-
-Remember: You're here to DISCUSS and HELP PLAN, not to generate code. Keep it conversational!`;
-}
-
+// =============================================
+// GENERATION PROMPT - MULTI-FILE OUTPUT
+// =============================================
 function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
     ? getWebsiteTypeContext(intent.websiteType) 
     : context?.projectContext?.websiteType 
       ? getWebsiteTypeContext(context.projectContext.websiteType)
       : "";
-  
-  const sectionsContext = intent.sections?.length 
-    ? `\n\nThe user specifically wants these sections: ${intent.sections.join(", ")}.`
-    : "";
-  
-  const styleContext = intent.styleChanges?.length
-    ? `\n\nStyle preferences detected: ${intent.styleChanges.join(", ")}.`
-    : context?.projectContext?.colorScheme
-      ? `\n\nUser prefers ${context.projectContext.colorScheme} color scheme based on earlier conversation.`
-      : "";
 
-  const memoryContext = context?.summary 
-    ? `\n\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to maintain consistency with previous discussions.`
-    : "";
+  return `You are Weblitho, an elite AI website builder. You MUST generate complete multi-file React/Next.js projects.
 
-  return `You are Weblitho, an elite AI website builder like Lovable.dev and v0.dev. You generate complete, production-ready multi-file React projects.
-
-## YOUR CAPABILITIES
-- You understand user intent deeply, even from vague descriptions
-- You generate complete, functional multi-file projects with real content
-- You follow modern design trends and best practices
-- You create accessible, responsive, performant code
-- You remember context from previous conversations to maintain consistency
-${memoryContext}
-
-## OUTPUT FORMAT - CRITICAL
+## CRITICAL: OUTPUT FORMAT
 You MUST output a valid JSON object with this EXACT structure:
 {
   "files": [
     { "path": "app/layout.tsx", "content": "..." },
     { "path": "app/page.tsx", "content": "..." },
-    { "path": "components/Navbar.tsx", "content": "..." }
+    { "path": "app/globals.css", "content": "..." },
+    { "path": "components/Navbar.tsx", "content": "..." },
+    { "path": "components/Hero.tsx", "content": "..." },
+    { "path": "components/Features.tsx", "content": "..." },
+    { "path": "components/CTA.tsx", "content": "..." },
+    { "path": "components/Footer.tsx", "content": "..." }
   ],
   "preview": "<!DOCTYPE html>..."
 }
 
-RULES:
-1. Output ONLY the JSON object - NO markdown code blocks, NO explanations
-2. The "files" array contains ALL project files as separate components
-3. The "preview" is a self-contained HTML for live preview (CDN React + Tailwind)
-4. Every file must have "path" and "content" keys
-5. Start with { and end with }
+## ABSOLUTE RULES:
+1. Output ONLY valid JSON - NO markdown, NO code blocks, NO explanations
+2. Start with { and end with }
+3. The "files" array MUST contain AT LEAST 6 separate component files
+4. Each file has "path" and "content" keys
+5. "preview" is self-contained HTML for iframe rendering
 
-## UNDERSTANDING THE REQUEST
-User wants: "${userPrompt}"
+## REQUIRED FILES (MINIMUM):
+1. app/layout.tsx - Root layout with metadata
+2. app/page.tsx - Main page importing all components
+3. app/globals.css - Global styles with Tailwind
+4. components/Navbar.tsx - Navigation component
+5. components/Hero.tsx - Hero section component
+6. components/Features.tsx - Features section
+7. components/CTA.tsx - Call to action section
+8. components/Footer.tsx - Footer component
+
+## USER REQUEST:
+"${userPrompt}"
 ${websiteTypeContext}
-${sectionsContext}
-${styleContext}
 
-## DESIGN SYSTEM
-**Colors (Dark Theme Default)**: 
-- Background: slate-950, slate-900
-- Cards: slate-900/50, slate-800/50 with glass effect
-- Accents: cyan-500, violet-500, pink-500 (gradient)
-- Text: white, slate-300, slate-400
+## COMPONENT TEMPLATE:
+Each component file should look like:
+\`\`\`tsx
+// components/Hero.tsx
+export default function Hero() {
+  return (
+    <section className="py-24 bg-slate-950">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Component content */}
+      </div>
+    </section>
+  );
+}
+\`\`\`
 
-**Typography**:
-- Hero: text-5xl md:text-6xl lg:text-7xl font-bold
-- Section titles: text-3xl md:text-4xl font-bold
-- Subtitles: text-xl text-slate-400
-- Body: text-base md:text-lg text-slate-300
-
-**Spacing**:
+## DESIGN SYSTEM:
+- Background: bg-slate-950, bg-slate-900
+- Cards: bg-white/5 backdrop-blur-xl border border-white/10
+- Text: text-white, text-slate-300, text-slate-400
+- Accents: from-cyan-500 via-violet-500 to-pink-500
+- Hero text: text-5xl md:text-6xl lg:text-7xl font-bold
 - Sections: py-24 md:py-32
 - Containers: max-w-7xl mx-auto px-6
-- Component gaps: gap-6 md:gap-8
 
-**Effects**:
-- Glass: bg-white/5 backdrop-blur-xl border border-white/10
-- Gradients: from-cyan-500 via-violet-500 to-pink-500
-- Shadows: shadow-2xl shadow-cyan-500/20
-- Animations: hover:scale-105 transition-all duration-300
-
-## QUALITY REQUIREMENTS
-1. ✅ Fully responsive (mobile-first)
-2. ✅ Semantic HTML (header, main, section, footer)
-3. ✅ Accessible (proper contrast, alt text, ARIA labels)
-4. ✅ Interactive (hover states, transitions, animations)
-5. ✅ Complete (NO Lorem ipsum - real compelling content)
-6. ✅ Professional copywriting that converts
-7. ✅ Consistent design language throughout
-8. ✅ Each component in its own file
-9. ✅ TypeScript with proper types
-10. ✅ Next.js 14 App Router conventions
+## PREVIEW HTML TEMPLATE:
+The "preview" field must be a complete HTML document:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
+    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  </style>
+</head>
+<body class="bg-slate-950 text-white antialiased">
+  <!-- All sections inline -->
+</body>
+</html>
 
 Generate the complete multi-file project JSON now.`;
 }
 
+// =============================================
+// MODIFICATION PROMPT - MULTI-FILE OUTPUT
+// =============================================
 function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string, context?: ConversationContext): string {
-  const intentInstructions = getModificationInstructions(intent);
-  
-  const memoryContext = context?.summary 
-    ? `\n## CONVERSATION MEMORY\n${context.summary}\n\nUse this context to understand what the user has been building and maintain consistency.`
-    : "";
-  
-  const previousChanges = context?.projectContext?.modifications?.length
-    ? `\n## PREVIOUS CHANGES MADE\n${context.projectContext.modifications.join("\n- ")}`
-    : "";
-  
-  return `You are Weblitho, modifying an existing website project based on user feedback.
+  return `You are Weblitho, modifying an existing multi-file website project.
 
-## YOUR TASK
-The user wants to: "${userPrompt}"
-Intent type: ${intent.type.toUpperCase()}
-${intentInstructions}
-${memoryContext}
-${previousChanges}
-
-## OUTPUT FORMAT - CRITICAL
-You MUST output a valid JSON object with this EXACT structure:
+## CRITICAL: OUTPUT FORMAT
+You MUST output a valid JSON object:
 {
   "files": [
     { "path": "app/page.tsx", "content": "..." },
@@ -899,48 +660,44 @@ You MUST output a valid JSON object with this EXACT structure:
   "preview": "<!DOCTYPE html>..."
 }
 
-RULES:
-1. Output ONLY the JSON object - NO markdown, NO explanations
-2. Include ALL files from the original project (modified or not)
-3. Update only the files that need changes
-4. The "preview" must reflect all changes
-5. Start with { and end with }
+## RULES:
+1. Output ONLY valid JSON - NO markdown, NO explanations
+2. Include ALL files (modified and unmodified)
+3. The "preview" must reflect all changes
+4. Start with { and end with }
 
-## CURRENT PROJECT CODE
+## USER REQUEST:
+"${userPrompt}"
+
+## CURRENT PROJECT CODE:
 ${currentCode}
 
-## MODIFICATION RULES
-1. ${intent.type === "fix" ? "Identify and FIX the issue completely" : "Make ONLY the requested changes"}
-2. PRESERVE all structure, styles, and functionality not being changed
-3. Keep all imports and component relationships intact
-4. Maintain design consistency and visual quality
-5. Ensure all files remain valid TypeScript/React
+## MODIFICATION TYPE: ${intent.type.toUpperCase()}
+${getModificationInstructions(intent)}
 
 Return the complete modified project JSON now.`;
 }
 
 function getWebsiteTypeContext(type: string): string {
   const contexts: Record<string, string> = {
-    saas: `This is a SaaS/Software product website. Include: Navbar, Hero, Features, Pricing, Testimonials, CTA, Footer.`,
-    landing: `This is a landing page. Include: Navbar, Hero, Features, SocialProof, CTA, Footer.`,
-    portfolio: `This is a portfolio/personal website. Include: Navbar, Hero, Projects, About, Contact, Footer.`,
-    ecommerce: `This is an e-commerce website. Include: Navbar, Hero, ProductGrid, Categories, Testimonials, Footer.`,
-    agency: `This is an agency/studio website. Include: Navbar, Hero, Services, Work, Team, Contact, Footer.`,
-    startup: `This is a startup/launch page. Include: Navbar, Hero, Problem, Features, Team, CTA, Footer.`,
+    saas: `\n\nSaaS website - Include: Navbar, Hero with product mockup, Features grid (6 items), Pricing tiers, Testimonials, CTA, Footer.`,
+    landing: `\n\nLanding page - Include: Navbar, Hero with strong CTA, Features (3-4 items), Social proof, CTA, Footer.`,
+    portfolio: `\n\nPortfolio website - Include: Navbar, Hero with name/title, Projects grid, About section, Contact form, Footer.`,
+    ecommerce: `\n\nE-commerce website - Include: Navbar with cart, Hero with featured product, Product grid, Categories, Testimonials, Footer.`,
+    agency: `\n\nAgency website - Include: Navbar, Bold hero, Services grid, Case studies, Team section, Contact, Footer.`,
+    startup: `\n\nStartup launch page - Include: Navbar, Vision hero, Problem/solution, Features, Team, Waitlist CTA, Footer.`,
   };
-  
   return contexts[type] || "";
 }
 
 function getModificationInstructions(intent: Intent): string {
   const instructions: Record<string, string> = {
-    fix: `FIXING MODE: Carefully analyze all files for the reported issue and fix it while preserving all other code.`,
-    enhance: `ENHANCEMENT MODE: Improve visual quality, add animations, enhance typography. Do NOT change fundamental structure.`,
-    add_section: `ADD SECTION MODE: Create a new component file and add the import to page.tsx. Match the existing design system.`,
-    change_style: `STYLE CHANGE MODE: Apply the style changes across all affected components consistently.`,
-    change_content: `CONTENT CHANGE MODE: Update only the specified text/content. Keep formatting intact.`,
-    modify: `MODIFICATION MODE: Make the specific changes requested. Preserve everything not being changed.`,
+    fix: `Find and FIX the issue. Preserve all other code.`,
+    enhance: `Improve visual quality and polish. Add animations. Do NOT change structure.`,
+    add_section: `Create a new component file and add its import to page.tsx.`,
+    change_style: `Apply style changes across all affected components consistently.`,
+    change_content: `Update only the specified text/content. Keep formatting intact.`,
+    modify: `Make the specific changes requested. Preserve everything else.`,
   };
-  
   return instructions[intent.type] || instructions.modify;
 }
