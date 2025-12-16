@@ -207,12 +207,19 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, conversationHistory = [], currentCode = null, model = "deepseek-free" } = await req.json();
+    const { 
+      prompt, 
+      conversationHistory = [], 
+      currentCode = null, 
+      currentFiles = [],
+      model = "deepseek-free" 
+    } = await req.json();
 
     console.log("=== GENERATE-PAGE START ===");
     console.log("Model:", model);
     console.log("Prompt:", prompt?.slice(0, 100) + "...");
     console.log("Has existing code:", !!currentCode);
+    console.log("Existing files count:", currentFiles?.length || 0);
 
     if (!prompt || typeof prompt !== 'string') {
       return new Response(
@@ -261,7 +268,7 @@ serve(async (req) => {
       }
     }
 
-    const isModification = currentCode !== null && currentCode.length > 100;
+    const isModification = (currentCode !== null && currentCode.length > 100) || (currentFiles && currentFiles.length > 0);
     const intent = detectIntent(prompt, isModification);
     console.log("Intent detected:", JSON.stringify(intent));
     
@@ -273,10 +280,17 @@ serve(async (req) => {
     
     const conversationContext = buildConversationContext(conversationHistory, currentCode, prompt);
     
-    // Build system prompt with STRONG multi-file instructions
-    const systemPrompt = isModification 
-      ? buildModificationPrompt(currentCode, intent, prompt, conversationContext) 
-      : buildGenerationPrompt(intent, prompt, conversationContext);
+    // Build system prompt - pass files for modification mode
+    let systemPrompt: string;
+    if (isModification) {
+      // Convert files to readable format for the AI
+      const filesContext = currentFiles && currentFiles.length > 0
+        ? currentFiles.map((f: {path: string; content: string}) => `=== ${f.path} ===\n${f.content}`).join('\n\n')
+        : currentCode || '';
+      systemPrompt = buildModificationPrompt(filesContext, intent, prompt, conversationContext);
+    } else {
+      systemPrompt = buildGenerationPrompt(intent, prompt, conversationContext);
+    }
 
     console.log("Provider:", modelConfig.provider);
     console.log("Mode:", isModification ? intent.type.toUpperCase() : "NEW");
@@ -648,34 +662,65 @@ Generate the complete multi-file project JSON now.`;
 // MODIFICATION PROMPT - MULTI-FILE OUTPUT
 // =============================================
 function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string, context?: ConversationContext): string {
-  return `You are Weblitho, modifying an existing multi-file website project.
+  // Determine which files need modification based on intent
+  const affectedAreas = getAffectedAreas(intent, userPrompt);
+  
+  return `You are Weblitho, an elite AI website builder. You are making a TARGETED modification to an existing website.
 
-## CRITICAL: OUTPUT FORMAT
-You MUST output a valid JSON object:
+## CRITICAL RULES - READ CAREFULLY:
+1. Output ONLY valid JSON - NO markdown, NO code blocks, NO explanations
+2. Start with { and end with }
+3. ONLY modify the specific parts requested - DO NOT regenerate everything
+4. Keep the exact same structure, just apply the requested changes
+
+## OUTPUT FORMAT:
 {
   "files": [
-    { "path": "app/page.tsx", "content": "..." },
-    { "path": "components/Hero.tsx", "content": "..." }
+    { "path": "components/Hero.tsx", "content": "...MODIFIED CODE..." }
   ],
-  "preview": "<!DOCTYPE html>..."
+  "preview": "<!DOCTYPE html>...COMPLETE HTML WITH CHANGES..."
 }
 
-## RULES:
-1. Output ONLY valid JSON - NO markdown, NO explanations
-2. Include ALL files (modified and unmodified)
-3. The "preview" must reflect all changes
-4. Start with { and end with }
-
-## USER REQUEST:
+## MODIFICATION REQUEST:
 "${userPrompt}"
 
-## CURRENT PROJECT CODE:
+## WHAT TO MODIFY: ${intent.type.toUpperCase()}
+${getModificationInstructions(intent)}
+${affectedAreas}
+
+## CURRENT WEBSITE CODE:
 ${currentCode}
 
-## MODIFICATION TYPE: ${intent.type.toUpperCase()}
-${getModificationInstructions(intent)}
+## IMPORTANT:
+- In "files", ONLY include files that you actually changed
+- If changing colors in Hero, only return the Hero.tsx file
+- If adding a section, return the new component AND updated page.tsx
+- The "preview" must be the COMPLETE HTML with your changes applied
+- DO NOT add new sections unless explicitly asked
+- DO NOT change the overall layout or structure
 
-Return the complete modified project JSON now.`;
+Apply the specific change and return the JSON now.`;
+}
+
+function getAffectedAreas(intent: Intent, prompt: string): string {
+  const lower = prompt.toLowerCase();
+  const areas: string[] = [];
+  
+  if (lower.includes("hero") || lower.includes("header") || lower.includes("banner")) areas.push("Hero section (components/Hero.tsx)");
+  if (lower.includes("nav") || lower.includes("menu")) areas.push("Navigation (components/Navbar.tsx)");
+  if (lower.includes("footer")) areas.push("Footer (components/Footer.tsx)");
+  if (lower.includes("feature")) areas.push("Features section (components/Features.tsx)");
+  if (lower.includes("pricing")) areas.push("Pricing section (components/Pricing.tsx)");
+  if (lower.includes("testimonial") || lower.includes("review")) areas.push("Testimonials (components/Testimonials.tsx)");
+  if (lower.includes("cta") || lower.includes("call to action")) areas.push("CTA section (components/CTA.tsx)");
+  if (lower.includes("color") || lower.includes("theme") || lower.includes("style")) areas.push("Apply color/style changes to affected components only");
+  if (lower.includes("animation") || lower.includes("hover")) areas.push("Add animations to specified elements only");
+  
+  if (areas.length === 0) {
+    areas.push("Apply change to the most relevant component only");
+  }
+  
+  return `\nAFFECTED AREAS:\n${areas.map(a => `- ${a}`).join('\n')}`;
 }
 
 function getWebsiteTypeContext(type: string): string {

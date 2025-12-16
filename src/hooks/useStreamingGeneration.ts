@@ -76,6 +76,7 @@ export function useStreamingGeneration() {
   const generate = useCallback(async ({
     prompt,
     currentCode,
+    currentFiles,
     model,
     conversationHistory,
     onChunk,
@@ -85,6 +86,7 @@ export function useStreamingGeneration() {
   }: {
     prompt: string;
     currentCode?: string | null;
+    currentFiles?: ProjectFile[];
     model: string;
     conversationHistory: Array<{ role: string; content: string }>;
     onChunk?: (html: string) => void;
@@ -129,6 +131,7 @@ export function useStreamingGeneration() {
             prompt,
             conversationHistory,
             currentCode,
+            currentFiles: currentFiles || [],
             model,
           }),
           signal: abortControllerRef.current.signal,
@@ -293,44 +296,47 @@ export function useStreamingGeneration() {
       const output = extractOutput(accumulatedTextRef.current);
       const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
+      // Merge modified files with existing files (don't replace all)
+      const mergedFiles = mergeFiles(currentFiles || [], output.files);
+      
       if (output.preview && output.preview.includes("</html>")) {
         setState(prev => ({ 
           ...prev, 
           preview: output.preview, 
-          files: output.files,
+          files: mergedFiles,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(output.preview, output.files);
+        onComplete?.(output.preview, mergedFiles);
       } else if (output.preview) {
         const completedHtml = completeHtml(output.preview);
         setState(prev => ({ 
           ...prev, 
           preview: completedHtml, 
-          files: output.files,
+          files: mergedFiles,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(completedHtml, output.files);
+        onComplete?.(completedHtml, mergedFiles);
       } else {
         const wrappedHtml = wrapInHtml(accumulatedTextRef.current.trim());
         setState(prev => ({ 
           ...prev, 
           preview: wrappedHtml, 
-          files: [],
+          files: mergedFiles.length > 0 ? mergedFiles : [],
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(wrappedHtml, []);
+        onComplete?.(wrappedHtml, mergedFiles.length > 0 ? mergedFiles : []);
       }
 
     } catch (err) {
@@ -453,6 +459,26 @@ function extractOutput(text: string): ExtractedOutput {
   if (htmlIdx !== -1) return { preview: "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx), files: [] };
 
   return { preview: "", files: [] };
+}
+
+// Merge modified files with existing files (update existing, add new)
+function mergeFiles(existingFiles: ProjectFile[], newFiles: ProjectFile[]): ProjectFile[] {
+  if (!newFiles || newFiles.length === 0) return existingFiles;
+  if (!existingFiles || existingFiles.length === 0) return newFiles;
+  
+  const fileMap = new Map<string, ProjectFile>();
+  
+  // Add all existing files first
+  for (const file of existingFiles) {
+    fileMap.set(file.path, file);
+  }
+  
+  // Override with new/modified files
+  for (const file of newFiles) {
+    fileMap.set(file.path, file);
+  }
+  
+  return Array.from(fileMap.values());
 }
 
 // Complete partial HTML
