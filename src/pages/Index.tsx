@@ -709,6 +709,7 @@ const Index = () => {
                     generationStatus={streaming.status}
                     generationProgress={streaming.progress}
                     validation={validation}
+                    streamingPreview={streaming.preview}
                   />
                 </div>
               ) : (

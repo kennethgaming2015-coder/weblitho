@@ -275,13 +275,20 @@ export function useStreamingGeneration() {
                 }));
               }
 
-              // Don't update preview during generation - keep showing loader
+              // LIVE STREAMING PREVIEW - update preview in real-time
               const now = Date.now();
-              if (chunkCount % 20 === 0 || now - lastPreviewUpdate > 200) {
+              if (chunkCount % 10 === 0 || now - lastPreviewUpdate > 150) {
                 lastPreviewUpdate = now;
                 const output = extractOutput(accumulatedTextRef.current);
-                if (output.preview) {
+                if (output.preview && output.preview.length > 100) {
                   lastPreviewRef.current = output.preview;
+                  // Update state with partial preview for live display
+                  setState(prev => ({
+                    ...prev,
+                    preview: output.preview,
+                  }));
+                  // Notify parent of partial preview
+                  onChunk?.(output.preview);
                 }
               }
             }

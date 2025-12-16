@@ -34,6 +34,7 @@ interface EnhancedPreviewProps {
   generationStatus?: string;
   generationProgress?: number;
   validation?: ValidationResult | null;
+  streamingPreview?: string; // Live preview during generation
 }
 
 const viewportDimensions = {
@@ -51,6 +52,7 @@ export const EnhancedPreview = ({
   generationStatus = "",
   generationProgress = 0,
   validation,
+  streamingPreview,
 }: EnhancedPreviewProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [showSplitView, setShowSplitView] = useState(false);
@@ -61,8 +63,10 @@ export const EnhancedPreview = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastCodeRef = useRef("");
 
+  // Use streaming preview if available during generation, otherwise use final code
+  const activeCode = isGenerating && streamingPreview ? streamingPreview : code;
   // Clean HTML for display
-  const cleanedHtml = cleanHtml(code);
+  const cleanedHtml = cleanHtml(activeCode);
   const hasContent = cleanedHtml.length > 100;
 
   // Refresh iframe when code changes after generation
@@ -117,8 +121,8 @@ export const EnhancedPreview = ({
     return { color: "bg-red-500/10 text-red-400 border-red-500/30", label: "Needs Work" };
   };
 
-  // Show generation loader while generating
-  if (isGenerating) {
+  // Show generation loader ONLY when generating AND no preview available yet
+  if (isGenerating && !hasContent) {
     return (
       <GenerationLoader
         status={generationStatus}
@@ -217,7 +221,19 @@ export const EnhancedPreview = ({
     : iframeContent;
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e] overflow-hidden">
+    <div className="h-full flex flex-col bg-[#1e1e1e] overflow-hidden relative">
+      {/* Live Streaming Indicator Overlay */}
+      {isGenerating && hasContent && (
+        <div className="absolute top-16 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/90 to-purple-500/90 text-white text-xs font-medium shadow-lg backdrop-blur-sm animate-pulse">
+          <div className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+          </div>
+          <span>Building live...</span>
+          <span className="text-white/70">{generationProgress}%</span>
+        </div>
+      )}
+
       {/* Header with validation badge */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-border/30">
         <div className="flex items-center gap-3">
@@ -226,9 +242,18 @@ export const EnhancedPreview = ({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-foreground">Live Preview</span>
-            <span className="flex items-center gap-1 text-xs text-emerald-400">
-              <CheckCircle className="h-3 w-3" />
-              Ready
+            <span className={`flex items-center gap-1 text-xs ${isGenerating ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {isGenerating ? (
+                <>
+                  <div className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                  Streaming
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-3 w-3" />
+                  Ready
+                </>
+              )}
             </span>
           </div>
           {validation && (
