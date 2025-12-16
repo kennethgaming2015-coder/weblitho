@@ -320,13 +320,15 @@ const Index = () => {
     
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     
-    // Include current code for modifications
+    // Include current code AND files for modifications
     const currentCode = generatedContent?.type === "web" ? generatedContent.preview : null;
+    const currentFiles = generatedContent?.type === "web" ? generatedContent.files : [];
     
     // Start streaming generation
     await streaming.generate({
       prompt: message,
       currentCode,
+      currentFiles, // Pass existing files for targeted modifications
       model: model || selectedModel,
       conversationHistory: messages,
       onChunk: (html) => {
