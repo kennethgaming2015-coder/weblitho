@@ -78,7 +78,7 @@ export const EnhancedPreview = ({
     }
   }, [cleanedHtml, isComplete]);
 
-  // Listen for console messages from iframe
+  // Listen for messages from iframe (console, navigation, interactions)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "console") {
@@ -90,6 +90,29 @@ export const EnhancedPreview = ({
           source: event.data.source,
         };
         setConsoleLogs((prev) => [...prev.slice(-99), newLog]);
+      }
+      
+      // Handle internal navigation
+      if (event.data?.type === "navigation") {
+        const path = event.data.path;
+        setCurrentUrl(path);
+        console.log("[Preview] Navigation to:", path);
+      }
+      
+      // Handle interactions (button clicks, etc.)
+      if (event.data?.type === "interaction") {
+        console.log("[Preview] Interaction:", event.data.element, event.data.text);
+      }
+      
+      // Handle form submissions
+      if (event.data?.type === "form_submit") {
+        console.log("[Preview] Form submitted:", event.data.data);
+        setConsoleLogs((prev) => [...prev.slice(-99), {
+          id: `${Date.now()}-${Math.random()}`,
+          type: "info",
+          message: `Form submitted: ${JSON.stringify(event.data.data)}`,
+          timestamp: new Date(),
+        }]);
       }
     };
 
@@ -153,72 +176,149 @@ export const EnhancedPreview = ({
   const displayCode = selectedFile?.content || cleanedHtml;
   const displayFileName = selectedFile?.name || "index.html";
 
-  // Inject console interceptor script
-  const iframeContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script>
-          // Intercept console methods and send to parent
-          ['log', 'warn', 'error', 'info'].forEach(level => {
-            const original = console[level];
-            console[level] = function(...args) {
-              original.apply(console, args);
-              try {
-                parent.postMessage({
-                  type: 'console',
-                  level: level,
-                  message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
-                }, '*');
-              } catch (e) {}
-            };
-          });
-
-          // Catch unhandled errors
-          window.onerror = function(msg, url, line, col, error) {
+  // Interactive navigation script - intercepts clicks and handles internal navigation
+  const interactiveScript = `
+    <script>
+      // Console interception
+      ['log', 'warn', 'error', 'info'].forEach(level => {
+        const original = console[level];
+        console[level] = function(...args) {
+          original.apply(console, args);
+          try {
             parent.postMessage({
               type: 'console',
-              level: 'error',
-              message: msg + ' at line ' + line,
-              source: url
+              level: level,
+              message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
             }, '*');
-          };
-        </script>
-      </head>
-      <body>
-        ${cleanedHtml.includes('<!DOCTYPE') ? '' : cleanedHtml}
-      </body>
-    </html>
-  `;
+          } catch (e) {}
+        };
+      });
+      
+      window.onerror = function(msg, url, line, col, error) {
+        parent.postMessage({
+          type: 'console',
+          level: 'error',
+          message: msg + ' at line ' + line,
+          source: url
+        }, '*');
+      };
 
-  const finalIframeContent = cleanedHtml.includes('<!DOCTYPE') 
-    ? cleanedHtml.replace('<head>', `<head>
-        <script>
-          ['log', 'warn', 'error', 'info'].forEach(level => {
-            const original = console[level];
-            console[level] = function(...args) {
-              original.apply(console, args);
-              try {
-                parent.postMessage({
-                  type: 'console',
-                  level: level,
-                  message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
-                }, '*');
-              } catch (e) {}
-            };
-          });
-          window.onerror = function(msg, url, line, col, error) {
-            parent.postMessage({
-              type: 'console',
-              level: 'error',
-              message: msg + ' at line ' + line,
-              source: url
-            }, '*');
-          };
-        </script>`)
-    : iframeContent;
+      // Navigation interception - make internal links work within preview
+      document.addEventListener('click', function(e) {
+        const link = e.target.closest('a');
+        if (link) {
+          const href = link.getAttribute('href');
+          
+          // Handle hash links (smooth scroll)
+          if (href && href.startsWith('#')) {
+            e.preventDefault();
+            const target = document.querySelector(href);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              parent.postMessage({ type: 'navigation', path: href }, '*');
+            }
+            return;
+          }
+          
+          // Handle relative links (internal pages)
+          if (href && !href.startsWith('http') && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
+            e.preventDefault();
+            parent.postMessage({ type: 'navigation', path: href }, '*');
+            
+            // Try to find and show the section
+            const sectionId = href.replace('/', '').replace('.html', '');
+            const section = document.getElementById(sectionId) || document.querySelector('[data-page="' + sectionId + '"]');
+            if (section) {
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            return;
+          }
+          
+          // External links - open in new tab
+          if (href && href.startsWith('http')) {
+            e.preventDefault();
+            window.open(href, '_blank', 'noopener,noreferrer');
+            return;
+          }
+        }
+      }, true);
+
+      // Make buttons interactive
+      document.addEventListener('click', function(e) {
+        const button = e.target.closest('button');
+        if (button && !button.disabled) {
+          // Add click feedback
+          button.style.transform = 'scale(0.98)';
+          setTimeout(() => { button.style.transform = ''; }, 100);
+          
+          // Notify parent of button click
+          parent.postMessage({ 
+            type: 'interaction', 
+            element: 'button', 
+            text: button.textContent?.trim()
+          }, '*');
+        }
+      }, true);
+
+      // Form submission handling
+      document.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        parent.postMessage({
+          type: 'form_submit',
+          data: data
+        }, '*');
+        
+        // Show success feedback
+        const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+        if (submitBtn) {
+          const originalText = submitBtn.textContent;
+          submitBtn.textContent = '✓ Submitted';
+          submitBtn.disabled = true;
+          setTimeout(() => {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+          }, 2000);
+        }
+      }, true);
+      
+      // Input focus styling
+      document.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('focus', function() {
+          this.style.outline = '2px solid #8b5cf6';
+          this.style.outlineOffset = '2px';
+        });
+        input.addEventListener('blur', function() {
+          this.style.outline = '';
+          this.style.outlineOffset = '';
+        });
+      });
+    </script>`;
+
+  // Build the final iframe content with interactivity
+  const buildIframeContent = (html: string): string => {
+    if (html.includes('<!DOCTYPE')) {
+      // Inject script after opening head tag
+      return html.replace('<head>', '<head>' + interactiveScript);
+    }
+    // Wrap in full HTML document
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${interactiveScript}
+</head>
+<body>
+  ${html}
+</body>
+</html>`;
+  };
+
+  const finalIframeContent = buildIframeContent(cleanedHtml);
 
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e] overflow-hidden relative">
