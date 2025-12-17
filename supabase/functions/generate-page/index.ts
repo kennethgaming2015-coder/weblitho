@@ -571,91 +571,107 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
       ? getWebsiteTypeContext(context.projectContext.websiteType)
       : "";
 
-  return `You are Weblitho, an elite AI website builder. You MUST generate complete multi-file React/Next.js projects.
+  return `You are Weblitho, an elite AI website builder creating PRODUCTION-QUALITY websites like Lovable.dev.
 
-## CRITICAL: OUTPUT FORMAT
-You MUST output a valid JSON object with this EXACT structure:
+## CRITICAL OUTPUT FORMAT
+Output ONLY a valid JSON object. NO markdown, NO code blocks, NO explanations before or after.
+
 {
   "files": [
-    { "path": "app/layout.tsx", "content": "..." },
-    { "path": "app/page.tsx", "content": "..." },
-    { "path": "app/globals.css", "content": "..." },
-    { "path": "components/Navbar.tsx", "content": "..." },
-    { "path": "components/Hero.tsx", "content": "..." },
-    { "path": "components/Features.tsx", "content": "..." },
-    { "path": "components/CTA.tsx", "content": "..." },
-    { "path": "components/Footer.tsx", "content": "..." }
+    { "path": "app/layout.tsx", "content": "full file content here" },
+    { "path": "app/page.tsx", "content": "full file content here" },
+    { "path": "app/globals.css", "content": "full file content here" },
+    { "path": "components/Navbar.tsx", "content": "full file content here" },
+    { "path": "components/Hero.tsx", "content": "full file content here" },
+    { "path": "components/Features.tsx", "content": "full file content here" },
+    { "path": "components/Pricing.tsx", "content": "full file content here" },
+    { "path": "components/Testimonials.tsx", "content": "full file content here" },
+    { "path": "components/CTA.tsx", "content": "full file content here" },
+    { "path": "components/Footer.tsx", "content": "full file content here" }
   ],
-  "preview": "<!DOCTYPE html>..."
+  "preview": "<!DOCTYPE html>...complete interactive HTML..."
 }
 
-## ABSOLUTE RULES:
-1. Output ONLY valid JSON - NO markdown, NO code blocks, NO explanations
-2. Start with { and end with }
-3. The "files" array MUST contain AT LEAST 6 separate component files
-4. Each file has "path" and "content" keys
-5. "preview" is self-contained HTML for iframe rendering
+## REQUIRED FILES (GENERATE ALL):
+1. app/layout.tsx - Root layout with fonts and metadata
+2. app/page.tsx - Main page composing all components
+3. app/globals.css - Complete Tailwind styles
+4. components/Navbar.tsx - Sticky navigation with mobile menu
+5. components/Hero.tsx - Full-width hero with gradient text and CTAs
+6. components/Features.tsx - Feature grid (6 items minimum)
+7. components/Pricing.tsx - Pricing tiers (3 plans)
+8. components/Testimonials.tsx - Customer testimonials
+9. components/CTA.tsx - Final call-to-action section
+10. components/Footer.tsx - Full footer with links
 
-## REQUIRED FILES (MINIMUM):
-1. app/layout.tsx - Root layout with metadata
-2. app/page.tsx - Main page importing all components
-3. app/globals.css - Global styles with Tailwind
-4. components/Navbar.tsx - Navigation component
-5. components/Hero.tsx - Hero section component
-6. components/Features.tsx - Features section
-7. components/CTA.tsx - Call to action section
-8. components/Footer.tsx - Footer component
-
-## USER REQUEST:
-"${userPrompt}"
+## USER REQUEST: "${userPrompt}"
 ${websiteTypeContext}
 
-## COMPONENT TEMPLATE:
-Each component file should look like:
-\`\`\`tsx
-// components/Hero.tsx
-export default function Hero() {
-  return (
-    <section className="py-24 bg-slate-950">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Component content */}
-      </div>
-    </section>
-  );
-}
-\`\`\`
+## DESIGN STANDARDS (MATCH LOVABLE.DEV QUALITY):
+- Dark theme: bg-[#0A0A0F] or bg-slate-950
+- Glassmorphism: bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl
+- Gradient accents: from-violet-500 via-purple-500 to-pink-500
+- Hero: min-h-screen flex items-center, text-6xl md:text-7xl lg:text-8xl font-bold
+- Sections: py-24 md:py-32, max-w-7xl mx-auto px-6
+- Cards: hover:scale-[1.02] transition-all duration-300
+- Buttons: px-8 py-4 rounded-xl font-semibold with gradient backgrounds
+- Text: text-white for headings, text-slate-400 for body
+- Add smooth scroll behavior and subtle animations
 
-## DESIGN SYSTEM:
-- Background: bg-slate-950, bg-slate-900
-- Cards: bg-white/5 backdrop-blur-xl border border-white/10
-- Text: text-white, text-slate-300, text-slate-400
-- Accents: from-cyan-500 via-violet-500 to-pink-500
-- Hero text: text-5xl md:text-6xl lg:text-7xl font-bold
-- Sections: py-24 md:py-32
-- Containers: max-w-7xl mx-auto px-6
+## INTERACTIVE PREVIEW HTML:
+The "preview" must be a COMPLETE, INTERACTIVE single-page HTML:
 
-## PREVIEW HTML TEMPLATE:
-The "preview" field must be a complete HTML document:
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Preview</title>
+  <title>Website Preview</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    * { scroll-behavior: smooth; }
     body { font-family: 'Inter', sans-serif; }
     .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-    .gradient-text { background: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .gradient-text { background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .gradient-btn { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+    .gradient-btn:hover { background: linear-gradient(135deg, #7c3aed, #c026d3); }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .float { animation: float 3s ease-in-out infinite; }
   </style>
 </head>
-<body class="bg-slate-950 text-white antialiased">
-  <!-- All sections inline -->
+<body class="bg-[#0A0A0F] text-white antialiased">
+  <!-- NAVBAR with id="nav" -->
+  <nav id="nav" class="fixed top-0 left-0 right-0 z-50 glass">...</nav>
+  
+  <!-- HERO with id="hero" -->
+  <section id="hero" class="min-h-screen flex items-center pt-20">...</section>
+  
+  <!-- FEATURES with id="features" -->
+  <section id="features" class="py-24">...</section>
+  
+  <!-- PRICING with id="pricing" -->
+  <section id="pricing" class="py-24">...</section>
+  
+  <!-- TESTIMONIALS with id="testimonials" -->
+  <section id="testimonials" class="py-24">...</section>
+  
+  <!-- CTA with id="cta" -->
+  <section id="cta" class="py-24">...</section>
+  
+  <!-- FOOTER with id="footer" -->
+  <footer id="footer" class="py-16 border-t border-white/10">...</footer>
 </body>
 </html>
 
-Generate the complete multi-file project JSON now.`;
+IMPORTANT: 
+- All sections MUST have unique id attributes for navigation
+- All navigation links use href="#sectionid" format
+- Buttons should have hover states and transitions
+- Include at least 6 features, 3 pricing plans, 3 testimonials
+- Make it look PREMIUM and PROFESSIONAL
+
+Generate the complete JSON now:`;
 }
 
 // =============================================
