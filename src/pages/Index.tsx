@@ -640,6 +640,25 @@ const Index = () => {
                   setSelectedFileView({ name, content });
                   setViewMode("code");
                 }}
+                onPageSelect={(path) => {
+                  // Navigate to section in preview via postMessage
+                  const iframe = document.querySelector('iframe[title="Preview"]') as HTMLIFrameElement;
+                  if (iframe?.contentWindow) {
+                    if (path.startsWith('#')) {
+                      // Hash navigation - scroll to section
+                      iframe.contentWindow.postMessage({ type: 'scrollTo', target: path }, '*');
+                      // Fallback: directly scroll in iframe
+                      const element = iframe.contentDocument?.querySelector(path);
+                      element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                      // Page navigation - could reload with different content
+                      toast({
+                        title: "Page Navigation",
+                        description: `Navigating to ${path}`,
+                      });
+                    }
+                  }
+                }}
               />
             </div>
           )}

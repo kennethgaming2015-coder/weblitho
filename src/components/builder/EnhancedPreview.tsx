@@ -296,6 +296,16 @@ export const EnhancedPreview = ({
           this.style.outlineOffset = '';
         });
       });
+
+      // Listen for scroll commands from parent (Pages panel navigation)
+      window.addEventListener('message', function(e) {
+        if (e.data?.type === 'scrollTo' && e.data.target) {
+          const target = document.querySelector(e.data.target);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      });
     </script>`;
 
   // Build the final iframe content with interactivity

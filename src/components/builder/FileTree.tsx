@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown, FileCode, FileText, Folder, FolderOpen, Code2, Braces, FileJson, FileType } from "lucide-react";
+import { ChevronRight, ChevronDown, FileCode, FileText, Folder, FolderOpen, Code2, Braces, FileJson, FileType, Globe, Home, Info, DollarSign, Users, Mail, HelpCircle, Settings, FileQuestion, LayoutGrid } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFile } from "@/hooks/useStreamingGeneration";
 
 interface ExtractedFile {
@@ -13,10 +14,18 @@ interface ExtractedFile {
   lines?: number;
 }
 
+interface PageRoute {
+  path: string;
+  name: string;
+  icon: React.ReactNode;
+  file?: string;
+}
+
 interface FileTreeProps {
   code: string;
   files?: ProjectFile[];
   onFileSelect?: (fileName: string, content: string) => void;
+  onPageSelect?: (path: string) => void;
 }
 
 const getFileIcon = (name: string) => {
@@ -27,6 +36,81 @@ const getFileIcon = (name: string) => {
   if (name.endsWith(".json")) return <FileJson className="h-4 w-4 text-emerald-400" />;
   if (name.endsWith(".svg")) return <FileType className="h-4 w-4 text-violet-400" />;
   return <FileText className="h-4 w-4 text-muted-foreground" />;
+};
+
+const getPageIcon = (path: string) => {
+  const lower = path.toLowerCase();
+  if (lower === "/" || lower === "/home" || lower.includes("index")) return <Home className="h-4 w-4" />;
+  if (lower.includes("about")) return <Info className="h-4 w-4" />;
+  if (lower.includes("pricing") || lower.includes("price")) return <DollarSign className="h-4 w-4" />;
+  if (lower.includes("team") || lower.includes("user")) return <Users className="h-4 w-4" />;
+  if (lower.includes("contact")) return <Mail className="h-4 w-4" />;
+  if (lower.includes("faq") || lower.includes("help")) return <HelpCircle className="h-4 w-4" />;
+  if (lower.includes("setting")) return <Settings className="h-4 w-4" />;
+  if (lower.includes("dashboard")) return <LayoutGrid className="h-4 w-4" />;
+  return <FileQuestion className="h-4 w-4" />;
+};
+
+// Extract pages from files and code
+const extractPages = (files: ProjectFile[], code: string): PageRoute[] => {
+  const pages: PageRoute[] = [];
+  const addedPaths = new Set<string>();
+
+  // Always add home page
+  pages.push({ path: "/", name: "Home", icon: getPageIcon("/"), file: "app/page.tsx" });
+  addedPaths.add("/");
+
+  // Extract from Next.js App Router structure (app/page.tsx, app/about/page.tsx, etc.)
+  files.forEach(file => {
+    const match = file.path.match(/^app\/(.+)\/page\.tsx$/);
+    if (match) {
+      const routePath = `/${match[1]}`;
+      if (!addedPaths.has(routePath)) {
+        const name = match[1].split("/").pop() || match[1];
+        pages.push({
+          path: routePath,
+          name: name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, " "),
+          icon: getPageIcon(routePath),
+          file: file.path
+        });
+        addedPaths.add(routePath);
+      }
+    }
+  });
+
+  // Extract from HTML sections with IDs (for single-page apps with hash navigation)
+  const sectionMatches = code.matchAll(/<(?:section|div)[^>]*id=["']([^"']+)["'][^>]*>/gi);
+  for (const match of sectionMatches) {
+    const sectionId = match[1];
+    const path = `#${sectionId}`;
+    if (!addedPaths.has(path) && !["root", "app", "main", "content"].includes(sectionId.toLowerCase())) {
+      pages.push({
+        path,
+        name: sectionId.charAt(0).toUpperCase() + sectionId.slice(1).replace(/-/g, " "),
+        icon: getPageIcon(sectionId)
+      });
+      addedPaths.add(path);
+    }
+  }
+
+  // Extract from nav links in code
+  const linkMatches = code.matchAll(/href=["']([#/][^"']*?)["']/gi);
+  for (const match of linkMatches) {
+    const href = match[1];
+    if (!addedPaths.has(href) && !href.startsWith("http") && href !== "#") {
+      const name = href.replace(/^[#/]/, "").replace(/-/g, " ").replace(/\//g, " / ");
+      if (name) {
+        pages.push({
+          path: href,
+          name: name.charAt(0).toUpperCase() + name.slice(1) || "Section",
+          icon: getPageIcon(href)
+        });
+        addedPaths.add(href);
+      }
+    }
+  }
+
+  return pages;
 };
 
 // Extract real components and code sections from generated HTML
@@ -330,51 +414,153 @@ const TreeNode = ({ node, depth, selectedFile, onSelect }: TreeNodeProps) => {
   );
 };
 
-export const FileTree = ({ code, files, onFileSelect }: FileTreeProps) => {
+interface PageItemProps {
+  page: PageRoute;
+  isSelected: boolean;
+  onSelect: (path: string) => void;
+}
+
+const PageItem = ({ page, isSelected, onSelect }: PageItemProps) => {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 py-2.5 px-3 cursor-pointer rounded-xl transition-all duration-200 group mx-2",
+        "hover:bg-primary/10 hover:scale-[1.02]",
+        isSelected && "bg-gradient-to-r from-primary/20 to-violet-500/10 border border-primary/30"
+      )}
+      onClick={() => onSelect(page.path)}
+    >
+      <div className={cn(
+        "flex items-center justify-center w-8 h-8 rounded-lg transition-all",
+        isSelected 
+          ? "bg-gradient-to-br from-primary to-violet-500 text-white" 
+          : "bg-muted/50 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
+      )}>
+        {page.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={cn(
+          "text-sm font-medium truncate transition-colors",
+          isSelected ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+        )}>
+          {page.name}
+        </p>
+        <p className="text-xs text-muted-foreground/60 truncate">
+          {page.path}
+        </p>
+      </div>
+      {page.file && (
+        <span className="text-[10px] text-muted-foreground/40 hidden group-hover:block">
+          {page.file.split("/").pop()}
+        </span>
+      )}
+    </div>
+  );
+};
+
+export const FileTree = ({ code, files = [], onFileSelect, onPageSelect }: FileTreeProps) => {
   const [selectedFile, setSelectedFile] = useState<string | null>("App.tsx");
+  const [selectedPage, setSelectedPage] = useState<string>("/");
+  const [activeTab, setActiveTab] = useState<string>("pages");
   
   // Use provided files or extract from code
   const fileTree = useMemo(() => {
     if (files && files.length > 0) {
-      // Convert ProjectFile[] to ExtractedFile[] structure
       return convertProjectFilesToTree(files);
     }
     return extractCodeStructure(code);
   }, [code, files]);
+
+  // Extract pages from files and code
+  const pages = useMemo(() => {
+    return extractPages(files || [], code);
+  }, [files, code]);
 
   const handleFileSelect = (name: string, content: string) => {
     setSelectedFile(name);
     onFileSelect?.(name, content);
   };
 
+  const handlePageSelect = (path: string) => {
+    setSelectedPage(path);
+    onPageSelect?.(path);
+  };
+
   return (
     <div className="h-full flex flex-col bg-card/30 backdrop-blur-xl">
-      <div className="px-3 py-3 border-b border-border/50 bg-card/50">
-        <div className="flex items-center gap-2">
-          <Folder className="h-4 w-4 text-primary" />
-          <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider">Explorer</h3>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+        <div className="px-2 pt-2 border-b border-border/50 bg-card/50">
+          <TabsList className="w-full h-9 bg-muted/30 p-1">
+            <TabsTrigger 
+              value="pages" 
+              className="flex-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5"
+            >
+              <Globe className="h-3.5 w-3.5" />
+              Pages
+              {pages.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-primary/20 text-primary">
+                  {pages.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="files" 
+              className="flex-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm gap-1.5"
+            >
+              <Folder className="h-3.5 w-3.5" />
+              Files
+            </TabsTrigger>
+          </TabsList>
         </div>
-      </div>
-      <ScrollArea className="flex-1">
-        <div className="py-2">
-          {fileTree.length > 0 ? (
-            fileTree.map((node, index) => (
-              <TreeNode
-                key={`${node.name}-${index}`}
-                node={node}
-                depth={0}
-                selectedFile={selectedFile}
-                onSelect={handleFileSelect}
-              />
-            ))
-          ) : (
-            <div className="px-4 py-8 text-center">
-              <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">No files generated yet</p>
+
+        <TabsContent value="pages" className="flex-1 m-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="py-2 space-y-1">
+              {pages.length > 0 ? (
+                pages.map((page, index) => (
+                  <PageItem
+                    key={`${page.path}-${index}`}
+                    page={page}
+                    isSelected={selectedPage === page.path}
+                    onSelect={handlePageSelect}
+                  />
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center">
+                  <Globe className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">No pages detected</p>
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">
+                    Generate a website to see pages
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </ScrollArea>
+          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="files" className="flex-1 m-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="py-2">
+              {fileTree.length > 0 ? (
+                fileTree.map((node, index) => (
+                  <TreeNode
+                    key={`${node.name}-${index}`}
+                    node={node}
+                    depth={0}
+                    selectedFile={selectedFile}
+                    onSelect={handleFileSelect}
+                  />
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center">
+                  <FileText className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-xs text-muted-foreground">No files generated yet</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
