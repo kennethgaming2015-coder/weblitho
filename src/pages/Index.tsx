@@ -13,6 +13,8 @@ import { TemplateGallery } from "@/components/builder/TemplateGallery";
 import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
 import { PagesPanel } from "@/components/builder/PagesPanel";
+import { PublishDialog } from "@/components/builder/PublishDialog";
+import { ImageToCode } from "@/components/builder/ImageToCode";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
 import { Footer } from "@/components/layout/Footer";
 import { useCredits } from "@/hooks/useCredits";
@@ -555,6 +557,11 @@ const Index = () => {
                   <span className="hidden md:inline">New</span>
                 </Button>
                 
+                <ImageToCode 
+                  onGenerate={(prompt) => handleMessageSubmit(prompt)} 
+                  isGenerating={streaming.isGenerating}
+                />
+                
                 <ExportOptions code={generatedContent?.preview || ""} files={generatedContent?.files} />
                 
                 <TemplateGallery onSelectTemplate={(prompt) => handleMessageSubmit(prompt)} />
@@ -568,6 +575,12 @@ const Index = () => {
                   projectId={projectId}
                   onGetVersions={getProjectVersions}
                   onRestore={restoreVersion}
+                />
+                
+                <PublishDialog 
+                  projectName={projectName}
+                  preview={generatedContent?.preview || ""}
+                  files={generatedContent?.files}
                 />
                 
                 <AlertDialog>
