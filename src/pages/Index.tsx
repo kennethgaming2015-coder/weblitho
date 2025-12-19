@@ -85,7 +85,7 @@ const Index = () => {
   const [projectName, setProjectName] = useState<string>("Untitled Project");
   const [isSaving, setIsSaving] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [pages, setPages] = useState<ProjectPage[]>([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
+  const [pages, setPages] = useState<ProjectPage[]>([{ id: 'home', name: 'Home', path: '/', preview: '', icon: 'home' }]);
   const [activePage, setActivePage] = useState<string>('home');
   const [showPagesPanel, setShowPagesPanel] = useState(true);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -143,7 +143,7 @@ const Index = () => {
           setPages(project.pages);
           setActivePage(project.pages[0].id);
         } else {
-          setPages([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
+          setPages([{ id: 'home', name: 'Home', path: '/', preview: project.preview || '', icon: 'home' }]);
           setActivePage('home');
         }
         
@@ -231,7 +231,7 @@ const Index = () => {
     setGeneratedContent(null);
     setValidation(null);
     setProjectName("Untitled Project");
-    setPages([{ id: 'home', name: 'Home', path: '/', icon: 'home' }]);
+    setPages([{ id: 'home', name: 'Home', path: '/', preview: '', icon: 'home' }]);
     setActivePage('home');
     setSearchParams({});
   };
@@ -265,10 +265,11 @@ const Index = () => {
     const newPage: ProjectPage = {
       ...page,
       id: `page-${Date.now()}`,
+      preview: '', // Will be generated
     };
     setPages(prev => [...prev, newPage]);
     setActivePage(newPage.id);
-    toast({ title: "Page added", description: `${page.name} page created` });
+    toast({ title: "Page added", description: `${page.name} page created. Send a message to generate content.` });
   };
 
   const handleDeletePage = (pageId: string) => {
@@ -287,8 +288,36 @@ const Index = () => {
     setActivePage(pageId);
     const page = pages.find(p => p.id === pageId);
     if (page) {
-      toast({ title: `Switched to ${page.name}` });
+      // Update the generated content to show this page's preview
+      if (page.preview) {
+        setGeneratedContent(prev => prev ? {
+          ...prev,
+          preview: page.preview,
+          files: page.files || prev.files,
+        } : null);
+      }
     }
+  };
+
+  // Navigate to a different page from preview clicks
+  const handlePreviewNavigate = (path: string) => {
+    const page = pages.find(p => p.path === path);
+    if (page) {
+      handlePageSelect(page.id);
+    } else {
+      // Page doesn't exist yet, offer to create it
+      toast({
+        title: "Page not found",
+        description: `Add "${path}" page to create content for it`,
+      });
+    }
+  };
+
+  // Get active page content
+  const getActivePageContent = () => {
+    const page = pages.find(p => p.id === activePage);
+    if (page?.preview) return page.preview;
+    return generatedContent?.preview || streaming.preview || '';
   };
 
   if (!user) {
@@ -314,19 +343,29 @@ const Index = () => {
       return;
     }
 
-    const userMessage = files && files.length > 0 
-      ? `${message}\n\n[${files.length} file(s) attached]`
+    // Get active page info for context
+    const activePageInfo = pages.find(p => p.id === activePage);
+    const isGeneratingForSubPage = activePageInfo && activePageInfo.path !== '/';
+    
+    // Add page context to the message if generating for a specific page
+    const pageContextMessage = isGeneratingForSubPage 
+      ? `[Generating for page: ${activePageInfo.name} (${activePageInfo.path})]\n\n${message}`
       : message;
+
+    const userMessage = files && files.length > 0 
+      ? `${pageContextMessage}\n\n[${files.length} file(s) attached]`
+      : pageContextMessage;
     
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     
     // Include current code AND files for modifications
-    const currentCode = generatedContent?.type === "web" ? generatedContent.preview : null;
+    // Use page-specific preview if available, otherwise use global content
+    const currentCode = activePageInfo?.preview || (generatedContent?.type === "web" ? generatedContent.preview : null);
     const currentFiles = generatedContent?.type === "web" ? generatedContent.files : [];
     
     // Start streaming generation
     await streaming.generate({
-      prompt: message,
+      prompt: pageContextMessage,
       currentCode,
       currentFiles, // Pass existing files for targeted modifications
       model: model || selectedModel,
@@ -358,6 +397,13 @@ const Index = () => {
       onComplete: async (preview, files) => {
         // Standard generation response
         console.log("Generation complete - preview length:", preview.length, "files:", files.length);
+        
+        // Update the active page's preview content
+        setPages(prev => prev.map(p => 
+          p.id === activePage 
+            ? { ...p, preview, files: files || p.files } 
+            : p
+        ));
         
         // Set final content with files
         setGeneratedContent({ 
@@ -720,7 +766,7 @@ const Index = () => {
               {viewMode === "preview" ? (
                 <div className="h-full animate-fade-in">
                   <EnhancedPreview
-                    code={generatedContent?.preview || streaming.preview}
+                    code={getActivePageContent()}
                     files={generatedContent?.files}
                     selectedFile={selectedFileView}
                     isGenerating={streaming.isGenerating}
@@ -729,6 +775,8 @@ const Index = () => {
                     generationProgress={streaming.progress}
                     validation={validation}
                     streamingPreview={streaming.preview}
+                    activePage={pages.find(p => p.id === activePage)?.path || '/'}
+                    onNavigate={handlePreviewNavigate}
                   />
                 </div>
               ) : (

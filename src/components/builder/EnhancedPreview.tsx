@@ -35,6 +35,8 @@ interface EnhancedPreviewProps {
   generationProgress?: number;
   validation?: ValidationResult | null;
   streamingPreview?: string; // Live preview during generation
+  activePage?: string; // Current active page path
+  onNavigate?: (path: string) => void; // Callback for page navigation
 }
 
 const viewportDimensions = {
@@ -53,6 +55,8 @@ export const EnhancedPreview = ({
   generationProgress = 0,
   validation,
   streamingPreview,
+  activePage = "/",
+  onNavigate,
 }: EnhancedPreviewProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [showSplitView, setShowSplitView] = useState(false);
@@ -92,11 +96,15 @@ export const EnhancedPreview = ({
         setConsoleLogs((prev) => [...prev.slice(-99), newLog]);
       }
       
-      // Handle internal navigation
+      // Handle internal navigation - trigger page switch
       if (event.data?.type === "navigation") {
         const path = event.data.path;
         setCurrentUrl(path);
         console.log("[Preview] Navigation to:", path);
+        // Notify parent to switch page content
+        if (onNavigate && path && !path.startsWith('#')) {
+          onNavigate(path);
+        }
       }
       
       // Handle interactions (button clicks, etc.)
@@ -157,15 +165,27 @@ export const EnhancedPreview = ({
 
   // Empty state
   if (!hasContent && !isGenerating) {
+    const isSubPage = activePage !== "/";
     return (
       <div className="h-full flex items-center justify-center bg-card/30">
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 max-w-md">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20">
             <Eye className="h-8 w-8 text-primary/60" />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground/60">Preview Area</p>
-            <p className="text-xs text-muted-foreground">Your creation will appear here</p>
+            {isSubPage ? (
+              <>
+                <p className="text-sm font-medium text-foreground/60">No content for {activePage}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Send a message to generate content for this page
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground/60">Preview Area</p>
+                <p className="text-xs text-muted-foreground">Your creation will appear here</p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -341,6 +361,14 @@ export const EnhancedPreview = ({
           </div>
           <span>Building live...</span>
           <span className="text-white/70">{generationProgress}%</span>
+        </div>
+      )}
+
+      {/* Current Page Indicator */}
+      {activePage !== "/" && !isGenerating && (
+        <div className="absolute top-16 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/90 border border-border/50 text-xs font-medium shadow-lg backdrop-blur-sm">
+          <span className="text-muted-foreground">Viewing:</span>
+          <span className="text-foreground">{activePage}</span>
         </div>
       )}
 

@@ -12,8 +12,9 @@ export interface ProjectPage {
   id: string;
   name: string;
   path: string;
-  preview?: string;
+  preview: string; // HTML content for this page
   icon?: string;
+  files?: ProjectFile[]; // Page-specific files
 }
 
 export interface Project {
@@ -69,7 +70,7 @@ export const useProjects = () => {
         const existingPages = (p as any).pages;
         const pages: ProjectPage[] = existingPages 
           ? parseJsonArray<ProjectPage>(existingPages as Json, [])
-          : [{ id: 'home', name: 'Home', path: '/', icon: 'home' }];
+          : [{ id: 'home', name: 'Home', path: '/', preview: p.preview || '', icon: 'home' }];
         
         return {
           id: p.id,
@@ -145,7 +146,7 @@ export const useProjects = () => {
         description: project.description,
         preview: project.preview,
         files: parseJsonArray<ProjectFile>(project.files as Json, []),
-        pages: [{ id: 'home', name: 'Home', path: '/', icon: 'home' }],
+        pages: [{ id: 'home', name: 'Home', path: '/', preview: project.preview || '', icon: 'home' }],
         chat_history: parseJsonArray<{ role: string; content: string }>(project.chat_history as Json, []),
         selected_model: project.selected_model || 'deepseek-free',
         created_at: project.created_at,
