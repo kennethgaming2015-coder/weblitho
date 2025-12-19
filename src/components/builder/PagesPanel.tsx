@@ -66,6 +66,7 @@ export const PagesPanel = ({
         name: newPageName,
         path: newPagePath.startsWith('/') ? newPagePath : `/${newPagePath}`,
         icon: 'default',
+        preview: '', // Empty preview, will be generated
       });
       setNewPageName('');
       setNewPagePath('');
@@ -78,6 +79,7 @@ export const PagesPanel = ({
       name: template.name,
       path: template.path,
       icon: template.icon,
+      preview: '', // Empty preview, will be generated
     });
     setIsAddDialogOpen(false);
   };
@@ -115,6 +117,7 @@ export const PagesPanel = ({
             const Icon = getIcon(page.icon);
             const isActive = page.id === activePage;
             const isEditing = editingPage === page.id;
+            const hasContent = page.preview && page.preview.length > 100;
 
             return (
               <div
@@ -126,7 +129,12 @@ export const PagesPanel = ({
                 }`}
                 onClick={() => !isEditing && onPageSelect(page.id)}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <div className="relative">
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {hasContent && (
+                    <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500" />
+                  )}
+                </div>
                 
                 {isEditing ? (
                   <Input
