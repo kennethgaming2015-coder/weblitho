@@ -6,11 +6,48 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Model mapping - OpenRouter for free, Gemini for premium
-const MODEL_MAPPING: Record<string, { provider: "openrouter" | "gemini"; model: string; requiresPaid: boolean; maxTokens: number }> = {
-  "deepseek-free": { provider: "openrouter", model: "tngtech/deepseek-r1t2-chimera:free", requiresPaid: false, maxTokens: 16000 },
-  "google/gemini-2.5-flash": { provider: "gemini", model: "gemini-2.5-flash", requiresPaid: true, maxTokens: 65536 },
-  "google/gemini-2.5-pro": { provider: "gemini", model: "gemini-2.5-pro", requiresPaid: true, maxTokens: 65536 },
+// Model mapping - ALL FREE OpenRouter models (best performing)
+const MODEL_MAPPING: Record<string, { provider: "openrouter"; model: string; requiresPaid: boolean; maxTokens: number; contextWindow: number }> = {
+  // Xiaomi MiMo-V2-Flash - BEST OVERALL, #1 on SWE-bench
+  "mimo-v2-flash": { 
+    provider: "openrouter", 
+    model: "xiaomi/mimo-v2-flash:free", 
+    requiresPaid: false, 
+    maxTokens: 32000,
+    contextWindow: 262000 
+  },
+  // Mistral Devstral 2 - Best for agentic coding
+  "devstral": { 
+    provider: "openrouter", 
+    model: "mistralai/devstral-2512:free", 
+    requiresPaid: false, 
+    maxTokens: 32000,
+    contextWindow: 262000 
+  },
+  // Qwen3 Coder 480B - Best for code generation
+  "qwen3-coder": { 
+    provider: "openrouter", 
+    model: "qwen/qwen3-coder:free", 
+    requiresPaid: false, 
+    maxTokens: 32000,
+    contextWindow: 262000 
+  },
+  // DeepSeek R1T2 Chimera - Best reasoning
+  "deepseek-chimera": { 
+    provider: "openrouter", 
+    model: "tngtech/deepseek-r1t2-chimera:free", 
+    requiresPaid: false, 
+    maxTokens: 32000,
+    contextWindow: 164000 
+  },
+  // Keep legacy mapping for backwards compatibility
+  "deepseek-free": { 
+    provider: "openrouter", 
+    model: "xiaomi/mimo-v2-flash:free", 
+    requiresPaid: false, 
+    maxTokens: 32000,
+    contextWindow: 262000 
+  },
 };
 
 const isPaidPlan = (plan: string): boolean => plan === 'pro' || plan === 'business' || plan === 'owner';
@@ -212,7 +249,7 @@ serve(async (req) => {
       conversationHistory = [], 
       currentCode = null, 
       currentFiles = [],
-      model = "deepseek-free" 
+      model = "mimo-v2-flash" 
     } = await req.json();
 
     console.log("=== GENERATE-PAGE START ===");
@@ -228,7 +265,7 @@ serve(async (req) => {
       );
     }
 
-    const modelConfig = MODEL_MAPPING[model] || MODEL_MAPPING["deepseek-free"];
+    const modelConfig = MODEL_MAPPING[model] || MODEL_MAPPING["mimo-v2-flash"];
     
     // Verify paid plan for premium models
     if (modelConfig.requiresPaid) {
@@ -295,11 +332,8 @@ serve(async (req) => {
     console.log("Provider:", modelConfig.provider);
     console.log("Mode:", isModification ? intent.type.toUpperCase() : "NEW");
 
-    if (modelConfig.provider === "openrouter") {
-      return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
-    } else {
-      return await callGemini(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
-    }
+    // All models use OpenRouter now (all free)
+    return await callOpenRouter(modelConfig, systemPrompt, prompt, conversationContext.recentMessages);
 
   } catch (e) {
     console.error("Generate-page error:", e);
@@ -533,7 +567,7 @@ Remember: You're here to DISCUSS, not to generate code.`;
       "X-Title": "Weblitho AI",
     },
     body: JSON.stringify({
-      model: "tngtech/deepseek-r1t2-chimera:free",
+      model: "xiaomi/mimo-v2-flash:free",
       messages,
       stream: true,
       max_tokens: 2000,
