@@ -74,7 +74,7 @@ const Index = () => {
   
   const [user, setUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
-  const [selectedModel, setSelectedModel] = useState<ModelType>("deepseek-free");
+  const [selectedModel, setSelectedModel] = useState<ModelType>("mimo-v2-flash");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [generatedContent, setGeneratedContent] = useState<GeneratedProject | null>(null);
   const [validation, setValidation] = useState<ValidationResult | null>(null);
@@ -138,7 +138,7 @@ const Index = () => {
           content: msg.content,
         }));
         setMessages(typedHistory);
-        setSelectedModel((project.selected_model as ModelType) || "deepseek-free");
+        setSelectedModel((project.selected_model as ModelType) || "mimo-v2-flash");
         
         // Load pages from project
         if (project.pages && project.pages.length > 0) {

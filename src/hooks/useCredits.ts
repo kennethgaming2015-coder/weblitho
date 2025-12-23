@@ -29,11 +29,12 @@ export interface CreditTransaction {
   created_at: string;
 }
 
-// Model credit multipliers - paid models cost more
+// Model credit multipliers - ALL FREE models have same cost
 export const MODEL_CREDIT_MULTIPLIERS: Record<ModelType, number> = {
-  "deepseek-free": 1,              // Free model - base cost
-  "google/gemini-2.5-flash": 1.5,  // 1.5x cost
-  "google/gemini-2.5-pro": 2.5,    // 2.5x cost (premium)
+  "mimo-v2-flash": 1,      // Free - base cost
+  "devstral": 1,           // Free - base cost
+  "qwen3-coder": 1,        // Free - base cost
+  "deepseek-chimera": 1,   // Free - base cost
 };
 
 export const PLAN_DETAILS = {
