@@ -596,7 +596,7 @@ Remember: You're here to DISCUSS, not to generate code.`;
 }
 
 // =============================================
-// GENERATION PROMPT - MULTI-FILE OUTPUT
+// GENERATION PROMPT - MULTI-PAGE WEBSITE
 // =============================================
 function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
@@ -605,107 +605,112 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
       ? getWebsiteTypeContext(context.projectContext.websiteType)
       : "";
 
-  return `You are Weblitho, an elite AI website builder creating PRODUCTION-QUALITY websites like Lovable.dev.
+  return `You are Weblitho, an elite AI website builder creating PRODUCTION-QUALITY multi-page websites.
 
 ## CRITICAL OUTPUT FORMAT
-Output ONLY a valid JSON object. NO markdown, NO code blocks, NO explanations before or after.
+Output ONLY a valid JSON object. NO markdown, NO code blocks, NO explanations.
 
 {
-  "files": [
-    { "path": "app/layout.tsx", "content": "full file content here" },
-    { "path": "app/page.tsx", "content": "full file content here" },
-    { "path": "app/globals.css", "content": "full file content here" },
-    { "path": "components/Navbar.tsx", "content": "full file content here" },
-    { "path": "components/Hero.tsx", "content": "full file content here" },
-    { "path": "components/Features.tsx", "content": "full file content here" },
-    { "path": "components/Pricing.tsx", "content": "full file content here" },
-    { "path": "components/Testimonials.tsx", "content": "full file content here" },
-    { "path": "components/CTA.tsx", "content": "full file content here" },
-    { "path": "components/Footer.tsx", "content": "full file content here" }
+  "pages": [
+    {
+      "id": "home",
+      "name": "Home", 
+      "path": "/",
+      "preview": "<!DOCTYPE html>...complete HTML for this page..."
+    },
+    {
+      "id": "about",
+      "name": "About",
+      "path": "/about",
+      "preview": "<!DOCTYPE html>...complete HTML for about page..."
+    },
+    {
+      "id": "pricing",
+      "name": "Pricing",
+      "path": "/pricing",
+      "preview": "<!DOCTYPE html>...complete HTML for pricing page..."
+    },
+    {
+      "id": "contact",
+      "name": "Contact",
+      "path": "/contact",
+      "preview": "<!DOCTYPE html>...complete HTML for contact page..."
+    }
   ],
-  "preview": "<!DOCTYPE html>...complete interactive HTML..."
+  "files": [
+    { "path": "app/layout.tsx", "content": "..." },
+    { "path": "app/page.tsx", "content": "..." },
+    { "path": "app/about/page.tsx", "content": "..." },
+    { "path": "app/pricing/page.tsx", "content": "..." },
+    { "path": "app/contact/page.tsx", "content": "..." },
+    { "path": "components/Navbar.tsx", "content": "..." },
+    { "path": "components/Footer.tsx", "content": "..." }
+  ],
+  "preview": "<!DOCTYPE html>...home page preview..."
 }
-
-## REQUIRED FILES (GENERATE ALL):
-1. app/layout.tsx - Root layout with fonts and metadata
-2. app/page.tsx - Main page composing all components
-3. app/globals.css - Complete Tailwind styles
-4. components/Navbar.tsx - Sticky navigation with mobile menu
-5. components/Hero.tsx - Full-width hero with gradient text and CTAs
-6. components/Features.tsx - Feature grid (6 items minimum)
-7. components/Pricing.tsx - Pricing tiers (3 plans)
-8. components/Testimonials.tsx - Customer testimonials
-9. components/CTA.tsx - Final call-to-action section
-10. components/Footer.tsx - Full footer with links
 
 ## USER REQUEST: "${userPrompt}"
 ${websiteTypeContext}
 
-## DESIGN STANDARDS (MATCH LOVABLE.DEV QUALITY):
+## REQUIRED PAGES - GENERATE ALL:
+1. **Home (/)** - Hero section, features overview, testimonials, CTA
+2. **About (/about)** - Company story, team, mission, values
+3. **Pricing (/pricing)** - 3 pricing tiers with features comparison
+4. **Contact (/contact)** - Contact form, office info, social links
+
+## REQUIRED FILES:
+1. app/layout.tsx - Root layout with shared Navbar and Footer
+2. app/page.tsx - Home page component
+3. app/about/page.tsx - About page component  
+4. app/pricing/page.tsx - Pricing page component
+5. app/contact/page.tsx - Contact page component
+6. components/Navbar.tsx - Navigation with links to all pages
+7. components/Footer.tsx - Footer with navigation links
+
+## DESIGN STANDARDS:
 - Dark theme: bg-[#0A0A0F] or bg-slate-950
-- Glassmorphism: bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl
+- Glassmorphism: bg-white/5 backdrop-blur-xl border border-white/10
 - Gradient accents: from-violet-500 via-purple-500 to-pink-500
-- Hero: min-h-screen flex items-center, text-6xl md:text-7xl lg:text-8xl font-bold
-- Sections: py-24 md:py-32, max-w-7xl mx-auto px-6
+- Hero: min-h-screen, text-6xl md:text-7xl font-bold
+- Sections: py-24, max-w-7xl mx-auto px-6
 - Cards: hover:scale-[1.02] transition-all duration-300
-- Buttons: px-8 py-4 rounded-xl font-semibold with gradient backgrounds
-- Text: text-white for headings, text-slate-400 for body
-- Add smooth scroll behavior and subtle animations
 
-## INTERACTIVE PREVIEW HTML:
-The "preview" must be a COMPLETE, INTERACTIVE single-page HTML:
+## NAVIGATION - CRITICAL:
+In the Navbar, use these exact links to enable page navigation:
+<a href="/" data-page="home">Home</a>
+<a href="/about" data-page="about">About</a>
+<a href="/pricing" data-page="pricing">Pricing</a>
+<a href="/contact" data-page="contact">Contact</a>
 
+## EACH PAGE PREVIEW MUST BE COMPLETE HTML:
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Website Preview</title>
+  <title>Page Title</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * { scroll-behavior: smooth; }
     body { font-family: 'Inter', sans-serif; }
     .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-    .gradient-text { background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .gradient-btn { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
-    .gradient-btn:hover { background: linear-gradient(135deg, #7c3aed, #c026d3); }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-    .float { animation: float 3s ease-in-out infinite; }
+    .gradient-text { background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
   </style>
 </head>
 <body class="bg-[#0A0A0F] text-white antialiased">
-  <!-- NAVBAR with id="nav" -->
-  <nav id="nav" class="fixed top-0 left-0 right-0 z-50 glass">...</nav>
+  <!-- NAVBAR - Same on all pages, with active state for current page -->
+  <nav class="fixed top-0 left-0 right-0 z-50 glass">...</nav>
   
-  <!-- HERO with id="hero" -->
-  <section id="hero" class="min-h-screen flex items-center pt-20">...</section>
+  <!-- PAGE CONTENT -->
+  <main class="pt-20">...</main>
   
-  <!-- FEATURES with id="features" -->
-  <section id="features" class="py-24">...</section>
-  
-  <!-- PRICING with id="pricing" -->
-  <section id="pricing" class="py-24">...</section>
-  
-  <!-- TESTIMONIALS with id="testimonials" -->
-  <section id="testimonials" class="py-24">...</section>
-  
-  <!-- CTA with id="cta" -->
-  <section id="cta" class="py-24">...</section>
-  
-  <!-- FOOTER with id="footer" -->
-  <footer id="footer" class="py-16 border-t border-white/10">...</footer>
+  <!-- FOOTER - Same on all pages -->
+  <footer class="border-t border-white/10">...</footer>
 </body>
 </html>
 
-IMPORTANT: 
-- All sections MUST have unique id attributes for navigation
-- All navigation links use href="#sectionid" format
-- Buttons should have hover states and transitions
-- Include at least 6 features, 3 pricing plans, 3 testimonials
-- Make it look PREMIUM and PROFESSIONAL
-
-Generate the complete JSON now:`;
+Generate the complete multi-page website JSON now:`;
 }
 
 // =============================================
