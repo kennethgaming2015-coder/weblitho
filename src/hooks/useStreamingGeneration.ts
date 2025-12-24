@@ -6,12 +6,22 @@ export interface ProjectFile {
   content: string;
 }
 
+export interface GeneratedPage {
+  id: string;
+  name: string;
+  path: string;
+  preview: string;
+  icon?: string;
+  files?: ProjectFile[];
+}
+
 interface StreamingState {
   isGenerating: boolean;
   status: string;
   statusType: "analyzing" | "planning" | "building" | "styling" | "finalizing" | "complete" | "error" | "conversation";
   preview: string;
-  files: ProjectFile[]; // Multi-file project structure
+  files: ProjectFile[];
+  pages: GeneratedPage[]; // Multi-page website structure
   error: string | null;
   progress: number;
   tokensGenerated: number;
@@ -44,6 +54,7 @@ export function useStreamingGeneration() {
     statusType: "analyzing",
     preview: "",
     files: [],
+    pages: [],
     error: null,
     progress: 0,
     tokensGenerated: 0,
@@ -90,7 +101,7 @@ export function useStreamingGeneration() {
     model: string;
     conversationHistory: Array<{ role: string; content: string }>;
     onChunk?: (html: string) => void;
-    onComplete?: (html: string, files: ProjectFile[]) => void;
+    onComplete?: (html: string, files: ProjectFile[], pages: GeneratedPage[]) => void;
     onConversation?: (response: string) => void;
     onError?: (error: string) => void;
   }) => {
@@ -105,6 +116,7 @@ export function useStreamingGeneration() {
       statusType: "analyzing",
       preview: "", 
       files: [],
+      pages: [],
       error: null,
       progress: 5,
       tokensGenerated: 0,
@@ -302,51 +314,70 @@ export function useStreamingGeneration() {
         }
       }
 
-      // Final extraction - NOW we show the preview and files
+      // Final extraction - NOW we show the preview, files, and pages
       const output = extractOutput(accumulatedTextRef.current);
       const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
       // Merge modified files with existing files (don't replace all)
       const mergedFiles = mergeFiles(currentFiles || [], output.files);
       
+      // Use pages from output, or create default home page
+      const extractedPages = output.pages.length > 0 ? output.pages : [{
+        id: 'home',
+        name: 'Home',
+        path: '/',
+        preview: output.preview,
+        icon: 'home'
+      }];
+      
       if (output.preview && output.preview.includes("</html>")) {
         setState(prev => ({ 
           ...prev, 
           preview: output.preview, 
           files: mergedFiles,
+          pages: extractedPages,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(output.preview, mergedFiles);
+        onComplete?.(output.preview, mergedFiles, extractedPages);
       } else if (output.preview) {
         const completedHtml = completeHtml(output.preview);
         setState(prev => ({ 
           ...prev, 
           preview: completedHtml, 
           files: mergedFiles,
+          pages: extractedPages,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(completedHtml, mergedFiles);
+        onComplete?.(completedHtml, mergedFiles, extractedPages);
       } else {
         const wrappedHtml = wrapInHtml(accumulatedTextRef.current.trim());
+        const defaultPages = [{
+          id: 'home',
+          name: 'Home', 
+          path: '/',
+          preview: wrappedHtml,
+          icon: 'home'
+        }];
         setState(prev => ({ 
           ...prev, 
           preview: wrappedHtml, 
           files: mergedFiles.length > 0 ? mergedFiles : [],
+          pages: defaultPages,
           status: `Complete in ${elapsed}s`,
           statusType: "complete",
           progress: 100,
           isComplete: true,
           isConversation: false,
         }));
-        onComplete?.(wrappedHtml, mergedFiles.length > 0 ? mergedFiles : []);
+        onComplete?.(wrappedHtml, mergedFiles.length > 0 ? mergedFiles : [], defaultPages);
       }
 
     } catch (err) {
@@ -380,14 +411,15 @@ export function useStreamingGeneration() {
   };
 }
 
-// Extract JSON output with files and preview from AI output
+// Extract JSON output with files, pages, and preview from AI output
 interface ExtractedOutput {
   preview: string;
   files: ProjectFile[];
+  pages: GeneratedPage[];
 }
 
 function extractOutput(text: string): ExtractedOutput {
-  if (!text) return { preview: "", files: [] };
+  if (!text) return { preview: "", files: [], pages: [] };
 
   let cleaned = text;
 
@@ -400,7 +432,7 @@ function extractOutput(text: string): ExtractedOutput {
   
   cleaned = cleaned.trim();
 
-  // Try to parse as JSON with files array
+  // Try to parse as JSON with files and pages arrays
   try {
     // Find the JSON object boundaries
     const jsonStart = cleaned.indexOf('{');
@@ -423,7 +455,33 @@ function extractOutput(text: string): ExtractedOutput {
           }));
       }
       
-      // Extract preview HTML
+      // Extract pages array - NEW MULTI-PAGE SUPPORT
+      let pages: GeneratedPage[] = [];
+      if (Array.isArray(parsed.pages)) {
+        pages = parsed.pages
+          .filter((p: any) => p && typeof p.id === 'string' && typeof p.name === 'string')
+          .map((p: any) => {
+            let pagePreview = p.preview || "";
+            if (typeof pagePreview === 'string') {
+              pagePreview = pagePreview
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\t/g, '\t')
+                .replace(/\\\\/g, '\\');
+            }
+            return {
+              id: p.id,
+              name: p.name,
+              path: p.path || '/',
+              preview: pagePreview,
+              icon: p.icon || getIconForPath(p.path),
+              files: p.files
+            };
+          });
+        console.log(`Extracted ${pages.length} pages from JSON output`);
+      }
+      
+      // Extract preview HTML (use first page preview or main preview)
       let preview = "";
       if (typeof parsed.preview === 'string') {
         preview = parsed.preview
@@ -431,11 +489,14 @@ function extractOutput(text: string): ExtractedOutput {
           .replace(/\\"/g, '"')
           .replace(/\\t/g, '\t')
           .replace(/\\\\/g, '\\');
+      } else if (pages.length > 0 && pages[0].preview) {
+        // Use home page preview as main preview
+        preview = pages[0].preview;
       }
       
-      if (files.length > 0 || preview.includes("<!DOCTYPE html>")) {
-        console.log(`Extracted ${files.length} files from JSON output`);
-        return { preview: preview || wrapInHtml("No preview available"), files };
+      if (files.length > 0 || pages.length > 0 || preview.includes("<!DOCTYPE html>")) {
+        console.log(`Extracted ${files.length} files, ${pages.length} pages from JSON output`);
+        return { preview: preview || wrapInHtml("No preview available"), files, pages };
       }
     }
   } catch (e) {
@@ -451,24 +512,38 @@ function extractOutput(text: string): ExtractedOutput {
     htmlFromJson = htmlFromJson.replace(/\\t/g, '\t');
     htmlFromJson = htmlFromJson.replace(/\\\\/g, '\\');
     if (htmlFromJson.includes("<!DOCTYPE html>")) {
-      return { preview: htmlFromJson, files: [] };
+      return { preview: htmlFromJson, files: [], pages: [] };
     }
   }
   
   // Fallback: Extract raw HTML
   const docMatch = cleaned.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
-  if (docMatch) return { preview: docMatch[0].trim(), files: [] };
+  if (docMatch) return { preview: docMatch[0].trim(), files: [], pages: [] };
 
   const htmlMatch = cleaned.match(/<html[\s\S]*<\/html>/i);
-  if (htmlMatch) return { preview: "<!DOCTYPE html>\n" + htmlMatch[0].trim(), files: [] };
+  if (htmlMatch) return { preview: "<!DOCTYPE html>\n" + htmlMatch[0].trim(), files: [], pages: [] };
 
   const partialIdx = cleaned.indexOf("<!DOCTYPE html>");
-  if (partialIdx !== -1) return { preview: cleaned.slice(partialIdx), files: [] };
+  if (partialIdx !== -1) return { preview: cleaned.slice(partialIdx), files: [], pages: [] };
 
   const htmlIdx = cleaned.indexOf("<html");
-  if (htmlIdx !== -1) return { preview: "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx), files: [] };
+  if (htmlIdx !== -1) return { preview: "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx), files: [], pages: [] };
 
-  return { preview: "", files: [] };
+  return { preview: "", files: [], pages: [] };
+}
+
+// Get icon name based on path
+function getIconForPath(path: string): string {
+  if (!path || path === '/') return 'home';
+  const pathLower = path.toLowerCase();
+  if (pathLower.includes('about')) return 'info';
+  if (pathLower.includes('pricing')) return 'dollar-sign';
+  if (pathLower.includes('contact')) return 'mail';
+  if (pathLower.includes('blog')) return 'book-open';
+  if (pathLower.includes('feature')) return 'star';
+  if (pathLower.includes('team')) return 'users';
+  if (pathLower.includes('service')) return 'briefcase';
+  return 'file-text';
 }
 
 // Merge modified files with existing files (update existing, add new)

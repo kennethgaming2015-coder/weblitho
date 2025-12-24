@@ -396,16 +396,36 @@ const Index = () => {
         
         // Don't show a toast for every conversation response - less intrusive
       },
-      onComplete: async (preview, files) => {
+      onComplete: async (preview, files, generatedPages) => {
         // Standard generation response
-        console.log("Generation complete - preview length:", preview.length, "files:", files.length);
+        console.log("Generation complete - preview length:", preview.length, "files:", files.length, "pages:", generatedPages.length);
         
-        // Update the active page's preview content
-        setPages(prev => prev.map(p => 
-          p.id === activePage 
-            ? { ...p, preview, files: files || p.files } 
-            : p
-        ));
+        // If we got real multi-page output, use those pages
+        if (generatedPages && generatedPages.length > 1) {
+          // Convert GeneratedPage to ProjectPage format
+          const projectPages: ProjectPage[] = generatedPages.map(p => ({
+            id: p.id,
+            name: p.name,
+            path: p.path,
+            preview: p.preview,
+            icon: p.icon || 'file-text',
+            files: p.files
+          }));
+          setPages(projectPages);
+          setActivePage(projectPages[0].id);
+          
+          toast({
+            title: "Multi-Page Website Generated",
+            description: `Created ${projectPages.length} pages: ${projectPages.map(p => p.name).join(', ')}`,
+          });
+        } else {
+          // Single page output - update the active page
+          setPages(prev => prev.map(p => 
+            p.id === activePage 
+              ? { ...p, preview, files: files || p.files } 
+              : p
+          ));
+        }
         
         // Set final content with files
         setGeneratedContent({ 
@@ -416,7 +436,10 @@ const Index = () => {
         
         const updatedMessages = [...messages, 
           { role: "user" as const, content: userMessage }, 
-          { role: "assistant" as const, content: "Generated beautiful website successfully ✨" }
+          { role: "assistant" as const, content: generatedPages.length > 1 
+            ? `Generated ${generatedPages.length}-page website successfully ✨` 
+            : "Generated beautiful website successfully ✨" 
+          }
         ];
         setMessages(updatedMessages);
 
@@ -461,8 +484,10 @@ const Index = () => {
         await saveProject(preview, files, updatedMessages);
 
         toast({
-          title: "Page Generated",
-          description: "Your web page is ready",
+          title: generatedPages.length > 1 ? "Website Generated" : "Page Generated",
+          description: generatedPages.length > 1 
+            ? `Your ${generatedPages.length}-page website is ready`
+            : "Your web page is ready",
         });
       },
       onError: (errorMessage) => {
