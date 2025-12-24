@@ -164,13 +164,14 @@ export function useStreamingGeneration() {
       let chunkCount = 0;
       let lastPreviewUpdate = Date.now();
 
-      // Handle conversation mode differently
+      // Handle conversation mode differently - DO NOT SET PREVIEW
       if (isConversationResponse) {
         setState(prev => ({
           ...prev,
           status: "AI is thinking...",
           statusType: "conversation",
           isConversation: true,
+          preview: "", // Keep preview empty for conversations
         }));
         
         let conversationText = "";
@@ -202,10 +203,11 @@ export function useStreamingGeneration() {
                 const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/gi, "");
                 conversationText += cleanContent;
                 
-                // Update conversation response in real-time
+                // Update conversation response in real-time - NO PREVIEW
                 setState(prev => ({
                   ...prev,
                   conversationResponse: conversationText.replace(/<think>[\s\S]*?<\/think>/gi, "").trim(),
+                  preview: "", // Never set preview for conversation
                 }));
               }
             } catch {
@@ -226,6 +228,7 @@ export function useStreamingGeneration() {
           isComplete: true,
           isConversation: true,
           conversationResponse: cleanedResponse,
+          preview: "", // Ensure preview stays empty for conversation
           status: "Ready",
           statusType: "complete",
           progress: 100,

@@ -470,7 +470,7 @@ export const EnhancedPreview = ({
   );
 };
 
-// Helper function to clean HTML
+// Helper function to clean HTML - only returns valid HTML content
 function cleanHtml(code: string): string {
   if (!code) return "";
 
@@ -485,6 +485,23 @@ function cleanHtml(code: string): string {
   cleaned = cleaned.replace(/```tsx\s*/gi, "");
   cleaned = cleaned.replace(/```jsx\s*/gi, "");
   cleaned = cleaned.replace(/```\s*/gi, "");
+
+  cleaned = cleaned.trim();
+  
+  // IMPORTANT: Check if this looks like HTML at all
+  // If it doesn't contain any HTML structure, return empty to avoid showing raw text
+  const hasHtmlIndicators = 
+    cleaned.includes("<!DOCTYPE html>") ||
+    cleaned.includes("<html") ||
+    cleaned.includes("<head") ||
+    cleaned.includes("<body") ||
+    cleaned.includes("<div") ||
+    cleaned.includes("<section");
+  
+  if (!hasHtmlIndicators) {
+    // This is likely a conversation response, not HTML
+    return "";
+  }
 
   // Try to extract preview from JSON output
   const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*}|\\"[\s\S]*?(?<!\\)")/);
@@ -517,5 +534,11 @@ function cleanHtml(code: string): string {
     return partial;
   }
 
-  return cleaned;
+  // Only return if it has a basic structure
+  if (cleaned.includes("<html") || cleaned.includes("<body")) {
+    return cleaned;
+  }
+
+  // Return empty if no valid HTML structure found
+  return "";
 }

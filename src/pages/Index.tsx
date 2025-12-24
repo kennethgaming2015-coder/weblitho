@@ -380,21 +380,21 @@ const Index = () => {
         });
       },
       onConversation: async (response) => {
-        // This is a conversation response - add to chat, don't generate
+        // This is a conversation response - add to chat, DON'T touch preview
         console.log("Conversation response received:", response.slice(0, 100));
         
+        // Add AI response to chat messages
         setMessages(prev => [...prev, { 
           role: "assistant" as const, 
           content: response 
         }]);
         
+        // DO NOT update generatedContent - keep existing preview
+        
         // Minimal credit cost for conversation
         await deductCredits(0.1, `Chat: ${message.slice(0, 30)}...`, projectId || undefined);
         
-        toast({
-          title: "AI Response",
-          description: "Ready to continue the conversation",
-        });
+        // Don't show a toast for every conversation response - less intrusive
       },
       onComplete: async (preview, files) => {
         // Standard generation response
