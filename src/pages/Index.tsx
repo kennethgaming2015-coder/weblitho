@@ -5,14 +5,13 @@ import { ChatInterface } from "@/components/chat/ChatInterface";
 import { EnhancedPreview } from "@/components/builder/EnhancedPreview";
 import { ModelType } from "@/components/builder/SettingsDialog";
 import { ComponentLibrary } from "@/components/builder/ComponentLibrary";
-import { FileTree } from "@/components/builder/FileTree";
 import { MonacoEditor } from "@/components/builder/MonacoEditor";
 import { ExportOptions } from "@/components/builder/ExportOptions";
 import { VersionHistory } from "@/components/builder/VersionHistory";
 import { TemplateGallery } from "@/components/builder/TemplateGallery";
 import { ImageUploadPanel } from "@/components/builder/ImageUploadPanel";
 import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
-import { PagesPanel } from "@/components/builder/PagesPanel";
+import { ProjectSidebar } from "@/components/builder/ProjectSidebar";
 import { PublishDialog } from "@/components/builder/PublishDialog";
 import { ImageToCode } from "@/components/builder/ImageToCode";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
@@ -81,7 +80,6 @@ const Index = () => {
   
   // Streaming generation hook
   const streaming = useStreamingGeneration();
-  const [showFileTree, setShowFileTree] = useState(true);
   const [selectedFileView, setSelectedFileView] = useState<{ name: string; content: string } | null>(null);
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
   const [projectName, setProjectName] = useState<string>("Untitled Project");
@@ -697,51 +695,24 @@ const Index = () => {
               generationProgress={streaming.progress}
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
+              activePage={pages.find(p => p.id === activePage)}
             />
           </div>
 
-          {/* Pages Panel - Side Panel */}
+          {/* Project Sidebar - Unified Pages & Files */}
           {showPagesPanel && (generatedContent?.preview || streaming.isGenerating) && (
-            <div className="w-[180px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
-              <PagesPanel
+            <div className="w-[200px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
+              <ProjectSidebar
                 pages={pages}
+                files={generatedContent?.files}
                 activePage={activePage}
                 onPageSelect={handlePageSelect}
                 onAddPage={handleAddPage}
                 onDeletePage={handleDeletePage}
                 onRenamePage={handleRenamePage}
-              />
-            </div>
-          )}
-
-          {/* File Tree - Side Panel */}
-          {showFileTree && (generatedContent?.preview || streaming.isGenerating) && (
-            <div className="w-[220px] border-r border-border/50 bg-card/20 animate-slide-in-right flex flex-col">
-              <FileTree 
-                code={generatedContent?.preview || ""} 
-                files={generatedContent?.files}
                 onFileSelect={(name, content) => {
                   setSelectedFileView({ name, content });
                   setViewMode("code");
-                }}
-                onPageSelect={(path) => {
-                  // Navigate to section in preview via postMessage
-                  const iframe = document.querySelector('iframe[title="Preview"]') as HTMLIFrameElement;
-                  if (iframe?.contentWindow) {
-                    if (path.startsWith('#')) {
-                      // Hash navigation - scroll to section
-                      iframe.contentWindow.postMessage({ type: 'scrollTo', target: path }, '*');
-                      // Fallback: directly scroll in iframe
-                      const element = iframe.contentDocument?.querySelector(path);
-                      element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    } else {
-                      // Page navigation - could reload with different content
-                      toast({
-                        title: "Page Navigation",
-                        description: `Navigating to ${path}`,
-                      });
-                    }
-                  }
                 }}
               />
             </div>
@@ -757,19 +728,11 @@ const Index = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowPagesPanel(!showPagesPanel)}
-                    className={`h-8 w-8 p-0 rounded-lg ${showPagesPanel ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
-                    title="Toggle Pages"
+                    className={`h-8 px-3 gap-2 rounded-lg ${showPagesPanel ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
+                    title="Toggle Sidebar"
                   >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowFileTree(!showFileTree)}
-                    className={`h-8 w-8 p-0 rounded-lg ${showFileTree ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-white/10'}`}
-                    title="Toggle File Tree"
-                  >
-                    {showFileTree ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                    {showPagesPanel ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                    <span className="text-xs hidden sm:inline">Sidebar</span>
                   </Button>
                   <div className="h-4 w-px bg-border/50" />
                 </div>
