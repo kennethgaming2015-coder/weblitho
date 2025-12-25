@@ -29,12 +29,12 @@ export interface CreditTransaction {
   created_at: string;
 }
 
-// Model credit multipliers - ALL FREE models have same cost
+// Model credit multipliers - Weblitho tiers
 export const MODEL_CREDIT_MULTIPLIERS: Record<ModelType, number> = {
-  "mimo-v2-flash": 1,      // Free - base cost
-  "devstral": 1,           // Free - base cost
-  "qwen3-coder": 1,        // Free - base cost
-  "deepseek-chimera": 1,   // Free - base cost
+  "mimo-v2-flash": 1,      // Weblitho Fast - base cost
+  "devstral": 1.5,         // Weblitho Code - 1.5x
+  "qwen3-coder": 2,        // Weblitho Pro - 2x
+  "deepseek-chimera": 3,   // Weblitho Premium - 3x
 };
 
 export const PLAN_DETAILS = {
