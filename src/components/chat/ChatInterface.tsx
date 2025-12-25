@@ -23,6 +23,7 @@ interface ChatInterfaceProps {
   generationProgress?: number;
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;
+  activePage?: { name: string; path: string };
 }
 
 export const ChatInterface = ({ 
@@ -33,7 +34,8 @@ export const ChatInterface = ({
   generationStatus = "",
   generationProgress = 0,
   selectedModel,
-  onModelChange 
+  onModelChange,
+  activePage
 }: ChatInterfaceProps) => {
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -257,6 +259,17 @@ export const ChatInterface = ({
 
       {/* Input Area */}
       <div className="flex-shrink-0 p-5 border-t border-border/50 bg-card/80 backdrop-blur-xl">
+        {/* Active Page Indicator */}
+        {activePage && activePage.path !== '/' && (
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-xs text-primary font-medium">
+              Editing: {activePage.name}
+            </span>
+            <span className="text-xs text-primary/60">({activePage.path})</span>
+          </div>
+        )}
+        
         {/* File Attachments */}
         {files.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">
@@ -300,7 +313,13 @@ export const ChatInterface = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isGenerating ? "Generating your website..." : "Describe your website in detail..."}
+            placeholder={
+              isGenerating 
+                ? "Generating..." 
+                : activePage && activePage.path !== '/' 
+                  ? `Describe changes for ${activePage.name}...` 
+                  : "Describe your website in detail..."
+            }
             className="min-h-[44px] max-h-[160px] resize-none bg-background border-border/60 focus:border-primary/50 text-sm placeholder:text-muted-foreground/60 rounded-xl"
             disabled={isGenerating}
           />
