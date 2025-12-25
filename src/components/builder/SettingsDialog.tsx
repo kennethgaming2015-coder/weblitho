@@ -20,14 +20,14 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-// Model type mapping - ALL FREE OpenRouter models
+// Model type mapping - Weblitho branded models
 export type ModelType = 
-  | "mimo-v2-flash"        // Xiaomi MiMo-V2-Flash - Best overall
-  | "devstral"             // Mistral Devstral 2 - Best for agentic coding
-  | "qwen3-coder"          // Qwen3 Coder 480B - Best for code generation
-  | "deepseek-chimera";    // DeepSeek R1T2 Chimera - Best for reasoning
+  | "mimo-v2-flash"        // Weblitho Fast
+  | "devstral"             // Weblitho Code
+  | "qwen3-coder"          // Weblitho Pro
+  | "deepseek-chimera";    // Weblitho Premium
 
-// Model display configuration - ALL FREE
+// Model display configuration with Weblitho branding
 const modelConfig: Record<ModelType, { 
   name: string; 
   description: string; 
@@ -35,38 +35,43 @@ const modelConfig: Record<ModelType, {
   badgeColor?: string;
   requiresPaid: boolean;
   icon: typeof Zap;
+  creditMultiplier: number;
 }> = {
   "mimo-v2-flash": {
-    name: "MiMo Flash",
-    description: "⚡ Best overall - #1 ranked, 262K context",
-    badge: "BEST",
+    name: "Weblitho Fast",
+    description: "⚡ Quick generation, great for simple sites",
+    badge: "FAST",
     badgeColor: "bg-green-500/10 text-green-500",
     requiresPaid: false,
-    icon: Zap
+    icon: Zap,
+    creditMultiplier: 1
   },
   "devstral": {
-    name: "Devstral 2",
-    description: "🛠️ Best for agentic coding - 256K context",
+    name: "Weblitho Code",
+    description: "🛠️ Optimized for complex code & multi-page sites",
     badge: "CODE",
     badgeColor: "bg-blue-500/10 text-blue-500",
     requiresPaid: false,
-    icon: Code
+    icon: Code,
+    creditMultiplier: 1.5
   },
   "qwen3-coder": {
-    name: "Qwen3 Coder",
-    description: "💻 480B params - Excellent for code",
-    badge: "480B",
+    name: "Weblitho Pro",
+    description: "💎 High-quality output for professional sites",
+    badge: "PRO",
     badgeColor: "bg-purple-500/10 text-purple-500",
     requiresPaid: false,
-    icon: Brain
+    icon: Brain,
+    creditMultiplier: 2
   },
   "deepseek-chimera": {
-    name: "DeepSeek Chimera",
-    description: "🧠 671B MoE - Best reasoning",
-    badge: "REASON",
+    name: "Weblitho Premium",
+    description: "🚀 Best quality - Advanced reasoning & design",
+    badge: "PREMIUM",
     badgeColor: "bg-amber-500/10 text-amber-500",
     requiresPaid: false,
-    icon: Rocket
+    icon: Rocket,
+    creditMultiplier: 3
   }
 };
 
@@ -135,19 +140,19 @@ export const SettingsDialog = ({ onSettingsChange, userPlan }: SettingsDialogPro
             Weblitho AI Model
           </DialogTitle>
           <DialogDescription>
-            Select from the best FREE AI models. All models are powered by OpenRouter.
+            Choose your AI model. Premium models produce higher quality output.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* All Free Badge */}
-          <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-3">
+          {/* Credit Info */}
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
             <div className="flex items-center gap-2 text-sm">
-              <Zap className="h-4 w-4 text-green-500" />
-              <span className="font-medium text-green-500">100% Free Models</span>
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-medium text-primary">Credit Usage</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              All models are free to use with no limits. Powered by OpenRouter.
+              Higher tier models use more credits but produce better quality websites.
             </p>
           </div>
 
@@ -184,6 +189,9 @@ export const SettingsDialog = ({ onSettingsChange, userPlan }: SettingsDialogPro
                                 {config.badge}
                               </span>
                             )}
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              {config.creditMultiplier}x credits
+                            </span>
                           </div>
                           <span className="text-xs text-muted-foreground">
                             {config.description}
@@ -197,18 +205,23 @@ export const SettingsDialog = ({ onSettingsChange, userPlan }: SettingsDialogPro
               
               {/* Model Info */}
               <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border/50">
-                <div className="flex items-center gap-2 mb-2">
-                  {(() => {
-                    const Icon = modelConfig[model].icon;
-                    return <Icon className="h-4 w-4 text-primary" />;
-                  })()}
-                  <span className="font-medium text-sm">{modelConfig[model].name}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const Icon = modelConfig[model].icon;
+                      return <Icon className="h-4 w-4 text-primary" />;
+                    })()}
+                    <span className="font-medium text-sm">{modelConfig[model].name}</span>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                    {modelConfig[model].creditMultiplier}x credits
+                  </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {model === "mimo-v2-flash" && "Xiaomi's flagship model. #1 ranked on SWE-bench, comparable to Claude Sonnet 4.5 at 3.5% of the cost."}
-                  {model === "devstral" && "Mistral's agentic coding model. 123B dense params, excels at multi-file editing and architecture-level context."}
-                  {model === "qwen3-coder" && "Qwen team's MoE code model. 480B total params, 35B active per forward pass, optimized for tool use."}
-                  {model === "deepseek-chimera" && "Merged from DeepSeek R1-0528, R1 & V3-0324. 671B MoE, runs 20% faster than original R1."}
+                  {model === "mimo-v2-flash" && "Quick and efficient. Perfect for landing pages, simple websites, and rapid prototyping."}
+                  {model === "devstral" && "Specialized for code. Best for multi-page sites, complex layouts, and custom functionality."}
+                  {model === "qwen3-coder" && "Professional quality. Produces polished, production-ready websites with attention to detail."}
+                  {model === "deepseek-chimera" && "Our most powerful model. Advanced reasoning for stunning designs and complex requirements."}
                 </p>
               </div>
             </div>
