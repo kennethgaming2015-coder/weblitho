@@ -692,10 +692,24 @@ const Index = () => {
               onStop={handleStop}
               isGenerating={streaming.isGenerating}
               generationStatus={streaming.status}
+              generationStatusType={streaming.statusType}
               generationProgress={streaming.progress}
+              tokensGenerated={streaming.tokensGenerated}
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
               activePage={pages.find(p => p.id === activePage)}
+              error={streaming.error}
+              onRetry={() => {
+                // Retry last message
+                const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+                if (lastUserMsg) {
+                  handleMessageSubmit(lastUserMsg.content);
+                }
+              }}
+              onDismissError={() => {
+                // Clear error from streaming state
+                // Note: This would require adding a clearError method to useStreamingGeneration
+              }}
             />
           </div>
 
