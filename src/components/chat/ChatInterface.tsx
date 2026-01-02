@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Loader2, Paperclip, X, FileText, RefreshCw, Wand2, Zap, Square, MessageSquare, Code, Palette, Layout } from "lucide-react";
+import { Send, Sparkles, Loader2, Paperclip, X, FileText, RefreshCw, Wand2, Zap, Square, MessageSquare, Code, Palette, Layout, Crown, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,17 +13,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ModelType, modelConfig } from "@/components/builder/SettingsDialog";
-
+import { ModelRecommendation } from "@/components/builder/ModelRecommendation";
+import { ErrorDisplay } from "@/components/builder/ErrorDisplay";
+import { StreamingIndicator } from "@/components/builder/StreamingIndicator";
 interface ChatInterfaceProps {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   onSubmit: (message: string, files?: File[], model?: ModelType) => void;
   onStop?: () => void;
   isGenerating?: boolean;
   generationStatus?: string;
+  generationStatusType?: "analyzing" | "planning" | "building" | "styling" | "finalizing" | "complete" | "error" | "conversation";
   generationProgress?: number;
+  tokensGenerated?: number;
   selectedModel: ModelType;
   onModelChange: (model: ModelType) => void;
   activePage?: { name: string; path: string };
+  error?: string | null;
+  onRetry?: () => void;
+  onDismissError?: () => void;
 }
 
 export const ChatInterface = ({ 
@@ -32,10 +39,15 @@ export const ChatInterface = ({
   onStop,
   isGenerating = false,
   generationStatus = "",
+  generationStatusType = "analyzing",
   generationProgress = 0,
+  tokensGenerated = 0,
   selectedModel,
   onModelChange,
-  activePage
+  activePage,
+  error,
+  onRetry,
+  onDismissError
 }: ChatInterfaceProps) => {
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -207,30 +219,26 @@ export const ChatInterface = ({
             </div>
           ))}
 
-          {/* Generation Status with Progress */}
+          {/* Generation Status with Enhanced Streaming Indicator */}
           {isGenerating && (
-            <div className="flex gap-3 animate-fade-in">
-              <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg">
-                <Loader2 className="h-4 w-4 text-white animate-spin" />
-              </div>
-              <div className="bg-muted/50 border border-border/50 rounded-2xl rounded-bl-md px-4 py-3 max-w-[85%]">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm text-foreground font-medium">
-                    {generationStatus || "Generating..."}
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-1.5 mb-2">
-                  <div 
-                    className="bg-gradient-to-r from-primary to-purple-500 h-1.5 rounded-full transition-all duration-300"
-                    style={{ width: `${generationProgress}%` }}
-                  />
-                </div>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-              </div>
+            <div className="animate-fade-in">
+              <StreamingIndicator
+                status={generationStatus || "Generating..."}
+                statusType={generationStatusType}
+                progress={generationProgress}
+                tokensGenerated={tokensGenerated}
+              />
+            </div>
+          )}
+
+          {/* Error Display */}
+          {error && !isGenerating && (
+            <div className="animate-fade-in">
+              <ErrorDisplay 
+                error={error} 
+                onRetry={onRetry}
+                onDismiss={onDismissError}
+              />
             </div>
           )}
         </div>
@@ -259,6 +267,13 @@ export const ChatInterface = ({
 
       {/* Input Area */}
       <div className="flex-shrink-0 p-5 border-t border-border/50 bg-card/80 backdrop-blur-xl">
+        {/* Model Recommendation */}
+        <ModelRecommendation
+          prompt={input}
+          currentModel={selectedModel}
+          onModelChange={onModelChange}
+        />
+
         {/* Active Page Indicator */}
         {activePage && activePage.path !== '/' && (
           <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
