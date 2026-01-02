@@ -7,14 +7,15 @@ const corsHeaders = {
 };
 
 // Model mapping - ALL FREE OpenRouter models (best performing)
-const MODEL_MAPPING: Record<string, { provider: "openrouter"; model: string; requiresPaid: boolean; maxTokens: number; contextWindow: number }> = {
+const MODEL_MAPPING: Record<string, { provider: "openrouter"; model: string; requiresPaid: boolean; maxTokens: number; contextWindow: number; fallback?: string }> = {
   // Xiaomi MiMo-V2-Flash - BEST OVERALL, #1 on SWE-bench
   "mimo-v2-flash": { 
     provider: "openrouter", 
     model: "xiaomi/mimo-v2-flash:free", 
     requiresPaid: false, 
     maxTokens: 32000,
-    contextWindow: 262000 
+    contextWindow: 262000,
+    fallback: "devstral"
   },
   // Mistral Devstral 2 - Best for agentic coding
   "devstral": { 
@@ -22,7 +23,8 @@ const MODEL_MAPPING: Record<string, { provider: "openrouter"; model: string; req
     model: "mistralai/devstral-2512:free", 
     requiresPaid: false, 
     maxTokens: 32000,
-    contextWindow: 262000 
+    contextWindow: 262000,
+    fallback: "qwen3-coder"
   },
   // Qwen3 Coder 480B - Best for code generation
   "qwen3-coder": { 
@@ -30,7 +32,8 @@ const MODEL_MAPPING: Record<string, { provider: "openrouter"; model: string; req
     model: "qwen/qwen3-coder:free", 
     requiresPaid: false, 
     maxTokens: 32000,
-    contextWindow: 262000 
+    contextWindow: 262000,
+    fallback: "deepseek-chimera"
   },
   // DeepSeek R1T2 Chimera - Best reasoning
   "deepseek-chimera": { 
@@ -348,7 +351,7 @@ serve(async (req) => {
 // OpenRouter API Call
 // =============================================
 async function callOpenRouter(
-  modelConfig: { model: string; maxTokens: number },
+  modelConfig: { model: string; maxTokens: number; fallback?: string },
   systemPrompt: string,
   userPrompt: string,
   conversationHistory: Array<{ role: string; content: string }>
@@ -383,6 +386,17 @@ async function callOpenRouter(
     const errorText = await response.text();
     console.error("OpenRouter error:", response.status, errorText);
     
+    // Try fallback model if available
+    if (modelConfig.fallback && MODEL_MAPPING[modelConfig.fallback]) {
+      console.log("Trying fallback model:", modelConfig.fallback);
+      return await callOpenRouter(
+        MODEL_MAPPING[modelConfig.fallback],
+        systemPrompt,
+        userPrompt,
+        conversationHistory
+      );
+    }
+    
     if (response.status === 429) {
       return new Response(
         JSON.stringify({ error: "AI service is busy. Please try again in a moment." }),
@@ -398,117 +412,6 @@ async function callOpenRouter(
 
   console.log("OpenRouter streaming started");
   return new Response(response.body, {
-    headers: { 
-      ...corsHeaders, 
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
-    },
-  });
-}
-
-// =============================================
-// Gemini API Call
-// =============================================
-async function callGemini(
-  modelConfig: { model: string; maxTokens: number },
-  systemPrompt: string,
-  userPrompt: string,
-  conversationHistory: Array<{ role: string; content: string }>
-) {
-  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
-
-  const contents = [];
-  for (const msg of conversationHistory.slice(-6)) {
-    contents.push({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }]
-    });
-  }
-  contents.push({ role: "user", parts: [{ text: userPrompt }] });
-
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig.model}:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`;
-
-  const response = await fetch(geminiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents,
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: modelConfig.maxTokens,
-        topP: 0.95,
-      }
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Gemini error:", response.status, errorText);
-    
-    if (response.status === 429) {
-      return new Response(
-        JSON.stringify({ error: "AI service is busy. Please try again." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-    
-    return new Response(
-      JSON.stringify({ error: "AI generation failed." }),
-      { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-
-  console.log("Gemini streaming started");
-
-  const transformedStream = new ReadableStream({
-    async start(controller) {
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      const encoder = new TextEncoder();
-      let buffer = "";
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            controller.close();
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr || jsonStr === "[DONE]") continue;
-
-            try {
-              const geminiData = JSON.parse(jsonStr);
-              const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-              
-              if (text) {
-                const openAIFormat = {
-                  choices: [{ delta: { content: text }, index: 0, finish_reason: null }]
-                };
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAIFormat)}\n\n`));
-              }
-            } catch { /* skip malformed */ }
-          }
-        }
-      } catch (err) {
-        console.error("Stream error:", err);
-        controller.error(err);
-      }
-    }
-  });
-
-  return new Response(transformedStream, {
     headers: { 
       ...corsHeaders, 
       "Content-Type": "text/event-stream",
@@ -596,7 +499,7 @@ Remember: You're here to DISCUSS, not to generate code.`;
 }
 
 // =============================================
-// GENERATION PROMPT - MULTI-PAGE WEBSITE
+// GENERATION PROMPT - PROFESSIONAL WEBSITE
 // =============================================
 function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
@@ -605,130 +508,127 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
       ? getWebsiteTypeContext(context.projectContext.websiteType)
       : "";
 
-  return `You are Weblitho, an elite AI website builder creating PRODUCTION-QUALITY multi-page websites.
+  return `You are Weblitho, an elite AI website builder that creates STUNNING, PRODUCTION-READY websites.
 
-## CRITICAL OUTPUT FORMAT
-Output ONLY a valid JSON object. NO markdown, NO code blocks, NO explanations.
+## YOUR MISSION
+Create a complete, beautiful, fully-functional website that looks like it was designed by a top agency.
+
+## OUTPUT FORMAT - CRITICAL
+You MUST output ONLY valid JSON. No markdown, no code blocks, no explanations.
 
 {
-  "pages": [
-    {
-      "id": "home",
-      "name": "Home", 
-      "path": "/",
-      "preview": "<!DOCTYPE html>...complete HTML for this page..."
-    },
-    {
-      "id": "about",
-      "name": "About",
-      "path": "/about",
-      "preview": "<!DOCTYPE html>...complete HTML for about page..."
-    },
-    {
-      "id": "pricing",
-      "name": "Pricing",
-      "path": "/pricing",
-      "preview": "<!DOCTYPE html>...complete HTML for pricing page..."
-    },
-    {
-      "id": "contact",
-      "name": "Contact",
-      "path": "/contact",
-      "preview": "<!DOCTYPE html>...complete HTML for contact page..."
-    }
-  ],
+  "preview": "<!DOCTYPE html>...COMPLETE HTML...",
   "files": [
-    { "path": "app/layout.tsx", "content": "..." },
     { "path": "app/page.tsx", "content": "..." },
-    { "path": "app/about/page.tsx", "content": "..." },
-    { "path": "app/pricing/page.tsx", "content": "..." },
-    { "path": "app/contact/page.tsx", "content": "..." },
-    { "path": "components/Navbar.tsx", "content": "..." },
-    { "path": "components/Footer.tsx", "content": "..." }
-  ],
-  "preview": "<!DOCTYPE html>...home page preview..."
+    { "path": "components/Hero.tsx", "content": "..." }
+  ]
 }
 
-## USER REQUEST: "${userPrompt}"
+## USER REQUEST
+"${userPrompt}"
 ${websiteTypeContext}
 
-## REQUIRED PAGES - GENERATE ALL:
-1. **Home (/)** - Hero section, features overview, testimonials, CTA
-2. **About (/about)** - Company story, team, mission, values
-3. **Pricing (/pricing)** - 3 pricing tiers with features comparison
-4. **Contact (/contact)** - Contact form, office info, social links
+## REQUIRED SECTIONS (include ALL of these)
+1. **Navigation** - Sticky/fixed navbar with logo, links, CTA button
+2. **Hero Section** - Full viewport, compelling headline, subtext, primary/secondary CTAs, optional image/illustration
+3. **Social Proof** - Logos, trust badges, or "Trusted by X+ companies"
+4. **Features/Benefits** - 3-6 cards with icons showing key value props
+5. **How It Works** - 3-4 step process with numbers
+6. **Testimonials** - 2-3 customer quotes with photos and names
+7. **Pricing** - 3 tiers (Basic, Pro, Enterprise) with feature comparison
+8. **FAQ** - 4-6 common questions in accordion style
+9. **CTA Section** - Final call-to-action before footer
+10. **Footer** - Logo, links organized by category, social icons, copyright
 
-## REQUIRED FILES:
-1. app/layout.tsx - Root layout with shared Navbar and Footer
-2. app/page.tsx - Home page component
-3. app/about/page.tsx - About page component  
-4. app/pricing/page.tsx - Pricing page component
-5. app/contact/page.tsx - Contact page component
-6. components/Navbar.tsx - Navigation with links to all pages
-7. components/Footer.tsx - Footer with navigation links
+## DESIGN STANDARDS - NON-NEGOTIABLE
 
-## DESIGN STANDARDS:
-- Dark theme: bg-[#0A0A0F] or bg-slate-950
-- Glassmorphism: bg-white/5 backdrop-blur-xl border border-white/10
-- Gradient accents: from-violet-500 via-purple-500 to-pink-500
-- Hero: min-h-screen, text-6xl md:text-7xl font-bold
-- Sections: py-24, max-w-7xl mx-auto px-6
-- Cards: hover:scale-[1.02] transition-all duration-300
+### Color Theme (Dark Mode)
+- Background: #0A0A0F or #030305
+- Cards/Surfaces: rgba(255,255,255,0.03) with backdrop-blur
+- Primary: violet-500 (#8b5cf6)
+- Secondary: purple-500 (#a855f7)
+- Accent: pink-500 (#ec4899)
+- Text: white for headings, gray-400 for body
+- Borders: rgba(255,255,255,0.1)
 
-## NAVIGATION - CRITICAL:
-In the Navbar, use these exact links to enable page navigation:
-<a href="/" data-page="home">Home</a>
-<a href="/about" data-page="about">About</a>
-<a href="/pricing" data-page="pricing">Pricing</a>
-<a href="/contact" data-page="contact">Contact</a>
+### Typography
+- Headings: text-5xl md:text-6xl lg:text-7xl font-bold
+- Subheadings: text-xl md:text-2xl text-gray-400
+- Body: text-base md:text-lg text-gray-300
 
-## EACH PAGE PREVIEW MUST BE COMPLETE HTML:
+### Spacing & Layout
+- Sections: py-24 md:py-32
+- Container: max-w-7xl mx-auto px-4 sm:px-6 lg:px-8
+- Cards: gap-6 md:gap-8
+- Generous whitespace between elements
+
+### Visual Effects
+- Glassmorphism: background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1);
+- Gradient text: background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+- Subtle shadows: box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+- Hover animations: transform: scale(1.02); transition: all 0.3s ease;
+
+### Interactive Elements
+- Buttons: Gradient backgrounds, hover effects, rounded-full or rounded-xl
+- Cards: Hover lift effect, subtle glow on hover
+- Links: Underline on hover, color transitions
+- Smooth scroll: scroll-behavior: smooth
+
+## HTML STRUCTURE
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Page Title</title>
+  <title>Professional Website</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * { scroll-behavior: smooth; }
     body { font-family: 'Inter', sans-serif; }
     .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
-    .gradient-text { background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .gradient-text { background: linear-gradient(135deg, #8b5cf6, #d946ef, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .glow { box-shadow: 0 0 60px rgba(139,92,246,0.3); }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    .float { animation: float 6s ease-in-out infinite; }
+    @keyframes pulse-glow { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+    .pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
   </style>
 </head>
-<body class="bg-[#0A0A0F] text-white antialiased">
-  <!-- NAVBAR - Same on all pages, with active state for current page -->
-  <nav class="fixed top-0 left-0 right-0 z-50 glass">...</nav>
-  
-  <!-- PAGE CONTENT -->
-  <main class="pt-20">...</main>
-  
-  <!-- FOOTER - Same on all pages -->
-  <footer class="border-t border-white/10">...</footer>
+<body class="bg-[#030305] text-white antialiased overflow-x-hidden">
+  <!-- ALL SECTIONS HERE -->
 </body>
 </html>
 
-Generate the complete multi-page website JSON now:`;
+## CONTENT QUALITY
+- Use realistic, professional copy - NOT lorem ipsum
+- Create compelling headlines that speak to benefits
+- Include specific numbers and stats (e.g., "10,000+ customers", "99.9% uptime")
+- Make CTAs action-oriented ("Get Started Free", "See It In Action")
+- Write authentic-sounding testimonials with real names
+
+## GENERATE NOW
+Create the complete website JSON with the preview containing ALL sections listed above.`;
 }
 
 // =============================================
-// MODIFICATION PROMPT - MULTI-FILE OUTPUT
+// MODIFICATION PROMPT
 // =============================================
 function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt: string, context?: ConversationContext): string {
-  // Determine which files need modification based on intent
   const affectedAreas = getAffectedAreas(intent, userPrompt);
   
   return `You are Weblitho, an elite AI website builder. You are making a TARGETED modification to an existing website.
 
-## CRITICAL RULES - READ CAREFULLY:
+## CRITICAL RULES
 1. Output ONLY valid JSON - NO markdown, NO code blocks, NO explanations
 2. Start with { and end with }
-3. ONLY modify the specific parts requested - DO NOT regenerate everything
+3. ONLY modify the specific parts requested
 4. Keep the exact same structure, just apply the requested changes
+5. Maintain all existing styling and design patterns
 
-## OUTPUT FORMAT:
+## OUTPUT FORMAT
 {
   "files": [
     { "path": "components/Hero.tsx", "content": "...MODIFIED CODE..." }
@@ -736,25 +636,26 @@ function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt
   "preview": "<!DOCTYPE html>...COMPLETE HTML WITH CHANGES..."
 }
 
-## MODIFICATION REQUEST:
+## MODIFICATION REQUEST
 "${userPrompt}"
 
 ## WHAT TO MODIFY: ${intent.type.toUpperCase()}
 ${getModificationInstructions(intent)}
 ${affectedAreas}
 
-## CURRENT WEBSITE CODE:
+## CURRENT WEBSITE CODE
 ${currentCode}
 
-## IMPORTANT:
+## IMPORTANT RULES
 - In "files", ONLY include files that you actually changed
 - If changing colors in Hero, only return the Hero.tsx file
 - If adding a section, return the new component AND updated page.tsx
 - The "preview" must be the COMPLETE HTML with your changes applied
-- DO NOT add new sections unless explicitly asked
-- DO NOT change the overall layout or structure
+- Maintain all existing animations, hover effects, and interactions
+- DO NOT remove any existing functionality
+- DO NOT change the overall theme unless specifically asked
 
-Apply the specific change and return the JSON now.`;
+Apply the modification and return the JSON now.`;
 }
 
 function getAffectedAreas(intent: Intent, prompt: string): string {
@@ -768,6 +669,7 @@ function getAffectedAreas(intent: Intent, prompt: string): string {
   if (lower.includes("pricing")) areas.push("Pricing section (components/Pricing.tsx)");
   if (lower.includes("testimonial") || lower.includes("review")) areas.push("Testimonials (components/Testimonials.tsx)");
   if (lower.includes("cta") || lower.includes("call to action")) areas.push("CTA section (components/CTA.tsx)");
+  if (lower.includes("faq")) areas.push("FAQ section (components/FAQ.tsx)");
   if (lower.includes("color") || lower.includes("theme") || lower.includes("style")) areas.push("Apply color/style changes to affected components only");
   if (lower.includes("animation") || lower.includes("hover")) areas.push("Add animations to specified elements only");
   
@@ -780,24 +682,25 @@ function getAffectedAreas(intent: Intent, prompt: string): string {
 
 function getWebsiteTypeContext(type: string): string {
   const contexts: Record<string, string> = {
-    saas: `\n\nSaaS website - Include: Navbar, Hero with product mockup, Features grid (6 items), Pricing tiers, Testimonials, CTA, Footer.`,
-    landing: `\n\nLanding page - Include: Navbar, Hero with strong CTA, Features (3-4 items), Social proof, CTA, Footer.`,
-    portfolio: `\n\nPortfolio website - Include: Navbar, Hero with name/title, Projects grid, About section, Contact form, Footer.`,
-    ecommerce: `\n\nE-commerce website - Include: Navbar with cart, Hero with featured product, Product grid, Categories, Testimonials, Footer.`,
-    agency: `\n\nAgency website - Include: Navbar, Bold hero, Services grid, Case studies, Team section, Contact, Footer.`,
-    startup: `\n\nStartup launch page - Include: Navbar, Vision hero, Problem/solution, Features, Team, Waitlist CTA, Footer.`,
+    saas: `\n\nThis is a SaaS/Software website. Focus on: product benefits, pricing tiers, integrations, security badges, demo/trial CTAs, dashboard preview images.`,
+    landing: `\n\nThis is a landing page. Focus on: single clear CTA, above-the-fold messaging, social proof, urgency elements, conversion optimization.`,
+    portfolio: `\n\nThis is a portfolio website. Focus on: project showcases with images, about section with photo, skills/expertise list, contact form, clean minimal design.`,
+    ecommerce: `\n\nThis is an e-commerce website. Focus on: product grid, categories, cart icon, featured products, trust badges, shipping info, reviews.`,
+    agency: `\n\nThis is an agency website. Focus on: bold creative design, case studies, team section, services, client logos, awards, contact.`,
+    startup: `\n\nThis is a startup launch page. Focus on: vision statement, problem/solution, waitlist signup, founder story, early access benefits.`,
+    crypto: `\n\nThis is a crypto/Web3 website. Focus on: futuristic design, tokenomics, roadmap, team, whitepaper link, community links, security audits.`,
   };
   return contexts[type] || "";
 }
 
 function getModificationInstructions(intent: Intent): string {
   const instructions: Record<string, string> = {
-    fix: `Find and FIX the issue. Preserve all other code.`,
-    enhance: `Improve visual quality and polish. Add animations. Do NOT change structure.`,
-    add_section: `Create a new component file and add its import to page.tsx.`,
-    change_style: `Apply style changes across all affected components consistently.`,
-    change_content: `Update only the specified text/content. Keep formatting intact.`,
-    modify: `Make the specific changes requested. Preserve everything else.`,
+    fix: `Find and FIX the issue. Preserve all other code and styling.`,
+    enhance: `Improve visual quality and polish. Add subtle animations. Do NOT change structure.`,
+    add_section: `Create a new section matching the existing design language. Place it in the logical position.`,
+    change_style: `Apply style changes consistently across all affected components. Maintain design cohesion.`,
+    change_content: `Update only the specified text/content. Keep all formatting and styling intact.`,
+    modify: `Make the specific changes requested. Preserve everything else exactly.`,
   };
   return instructions[intent.type] || instructions.modify;
 }
