@@ -155,11 +155,24 @@ export const EnhancedPreview = ({
   // Show generation loader ONLY when generating AND no preview available yet
   if (isGenerating && !hasContent) {
     return (
-      <GenerationLoader
-        status={generationStatus}
-        isGenerating={isGenerating}
-        progress={generationProgress}
-      />
+      <div className="h-full flex flex-col bg-[#0a0a0f]">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between px-4 py-2 bg-[#121218] border-b border-white/5">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500/30 to-purple-500/30 animate-pulse" />
+            <div className="space-y-1">
+              <div className="h-4 w-24 bg-white/10 rounded animate-pulse" />
+              <div className="h-3 w-16 bg-white/5 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        {/* Loader */}
+        <GenerationLoader
+          status={generationStatus}
+          isGenerating={isGenerating}
+          progress={generationProgress}
+        />
+      </div>
     );
   }
 
@@ -351,16 +364,26 @@ export const EnhancedPreview = ({
   const finalIframeContent = buildIframeContent(cleanedHtml);
 
   return (
-    <div className="h-full flex flex-col bg-[#1e1e1e] overflow-hidden relative">
-      {/* Live Streaming Indicator Overlay */}
+    <div className="h-full flex flex-col bg-[#0a0a0f] overflow-hidden relative">
+      {/* Live Streaming Indicator Overlay - More prominent */}
       {isGenerating && hasContent && (
-        <div className="absolute top-16 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/90 to-purple-500/90 text-white text-xs font-medium shadow-lg backdrop-blur-sm animate-pulse">
-          <div className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+        <div className="absolute top-16 left-4 right-4 z-20 flex items-center justify-between px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600/95 via-purple-600/95 to-pink-600/95 text-white text-sm font-medium shadow-xl backdrop-blur-md border border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+            </div>
+            <span className="font-semibold">Building your website...</span>
           </div>
-          <span>Building live...</span>
-          <span className="text-white/70">{generationProgress}%</span>
+          <div className="flex items-center gap-3">
+            <div className="w-32 h-2 bg-white/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${generationProgress}%` }}
+              />
+            </div>
+            <span className="text-white/90 font-mono text-xs w-10">{generationProgress}%</span>
+          </div>
         </div>
       )}
 

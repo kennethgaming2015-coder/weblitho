@@ -290,20 +290,34 @@ export function useStreamingGeneration() {
                 }));
               }
 
-              // LIVE STREAMING PREVIEW - update preview in real-time
+              // LIVE STREAMING PREVIEW - update preview in real-time for smoother UX
               const now = Date.now();
-              if (chunkCount % 10 === 0 || now - lastPreviewUpdate > 150) {
+              const timeSinceLastUpdate = now - lastPreviewUpdate;
+              
+              // More aggressive preview updates:
+              // - Every 5 chunks OR every 100ms for smoother updates
+              // - But don't update too frequently to avoid performance issues
+              if ((chunkCount % 5 === 0 || timeSinceLastUpdate > 100) && chunkCount > 20) {
                 lastPreviewUpdate = now;
                 const output = extractOutput(accumulatedTextRef.current);
-                if (output.preview && output.preview.length > 100) {
-                  lastPreviewRef.current = output.preview;
-                  // Update state with partial preview for live display
-                  setState(prev => ({
-                    ...prev,
-                    preview: output.preview,
-                  }));
-                  // Notify parent of partial preview
-                  onChunk?.(output.preview);
+                
+                // Show preview earlier - once we have any meaningful content
+                if (output.preview && output.preview.length > 50) {
+                  const previewToShow = output.preview.includes('</html>') 
+                    ? output.preview 
+                    : completeHtml(output.preview);
+                    
+                  if (previewToShow !== lastPreviewRef.current) {
+                    lastPreviewRef.current = previewToShow;
+                    // Update state with partial preview for live display
+                    setState(prev => ({
+                      ...prev,
+                      preview: previewToShow,
+                      files: output.files.length > 0 ? output.files : prev.files,
+                    }));
+                    // Notify parent of partial preview
+                    onChunk?.(previewToShow);
+                  }
                 }
               }
             }
