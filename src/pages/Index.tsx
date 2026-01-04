@@ -883,6 +883,7 @@ const Index = () => {
                     streamingPreview={streaming.preview}
                     activePage={pages.find(p => p.id === activePage)?.path || '/'}
                     onNavigate={handlePreviewNavigate}
+                    onEditElement={(prompt) => handleMessageSubmit(prompt)}
                   />
                 </div>
               ) : (
