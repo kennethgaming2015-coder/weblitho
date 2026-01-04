@@ -14,11 +14,14 @@ import { ProjectsGrid } from "@/components/builder/ProjectsGrid";
 import { ProjectSidebar } from "@/components/builder/ProjectSidebar";
 import { PublishDialog } from "@/components/builder/PublishDialog";
 import { ImageToCode } from "@/components/builder/ImageToCode";
+import { QuickActionBar } from "@/components/builder/QuickActionBar";
+import { KeyboardShortcutsHelp } from "@/components/builder/KeyboardShortcutsHelp";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
 import { Footer } from "@/components/layout/Footer";
 import { useCredits } from "@/hooks/useCredits";
 import { useStreamingGeneration } from "@/hooks/useStreamingGeneration";
-import { Moon, Sun, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText } from "lucide-react";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { Moon, Sun, LogOut, Trash2, Plus, PanelLeft, PanelLeftClose, Code2, Eye, LayoutDashboard, Save, FileText, Undo2, Redo2 } from "lucide-react";
 import weblithoLogo from "@/assets/weblitho-logo.png";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +39,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface Page {
   id: string;
@@ -88,6 +97,8 @@ const Index = () => {
   const [pages, setPages] = useState<ProjectPage[]>([{ id: 'home', name: 'Home', path: '/', preview: '', icon: 'home' }]);
   const [activePage, setActivePage] = useState<string>('home');
   const [showPagesPanel, setShowPagesPanel] = useState(true);
+  const [undoStack, setUndoStack] = useState<string[]>([]);
+  const [redoStack, setRedoStack] = useState<string[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -320,6 +331,43 @@ const Index = () => {
     return generatedContent?.preview || streaming.preview || '';
   };
 
+  // Undo/Redo handlers
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const previousState = undoStack[undoStack.length - 1];
+    setUndoStack(prev => prev.slice(0, -1));
+    if (generatedContent?.preview) {
+      setRedoStack(prev => [...prev, generatedContent.preview]);
+    }
+    setGeneratedContent(prev => prev ? { ...prev, preview: previousState } : null);
+    toast({ title: "Undo", description: "Reverted to previous version" });
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    const nextState = redoStack[redoStack.length - 1];
+    setRedoStack(prev => prev.slice(0, -1));
+    if (generatedContent?.preview) {
+      setUndoStack(prev => [...prev, generatedContent.preview]);
+    }
+    setGeneratedContent(prev => prev ? { ...prev, preview: nextState } : null);
+    toast({ title: "Redo", description: "Restored next version" });
+  };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onNewProject: handleNewProject,
+    onSave: async () => {
+      if (generatedContent?.preview) {
+        await saveProject(generatedContent.preview, generatedContent.files || [], messages);
+      }
+    },
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    onPreview: () => setViewMode("preview"),
+    onToggleTheme: toggleTheme,
+  });
+
   if (!user) {
     return null;
   }
@@ -423,6 +471,12 @@ const Index = () => {
               ? { ...p, preview, files: files || p.files } 
               : p
           ));
+        }
+        
+        // Add current state to undo stack before updating
+        if (generatedContent?.preview) {
+          setUndoStack(prev => [...prev.slice(-9), generatedContent.preview]); // Keep last 10
+          setRedoStack([]); // Clear redo stack on new change
         }
         
         // Set final content with files
@@ -567,29 +621,63 @@ const Index = () => {
             )}
             
             {messages.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <ComponentLibrary onAddComponent={(prompt) => handleMessageSubmit(prompt)} />
-                
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleNewProject}
-                  className="text-muted-foreground hover:text-foreground hover:bg-white/10 h-8 gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden md:inline">New</span>
-                </Button>
-                
-                <ImageToCode 
-                  onGenerate={(prompt) => handleMessageSubmit(prompt)} 
-                  isGenerating={streaming.isGenerating}
-                />
-                
-                <ExportOptions code={generatedContent?.preview || ""} files={generatedContent?.files} />
-                
-                <TemplateGallery onSelectTemplate={(prompt) => handleMessageSubmit(prompt)} />
-                
-                <ImageUploadPanel onInsertImage={(url) => {
+              <TooltipProvider>
+                <div className="flex items-center gap-1.5">
+                  {/* Undo/Redo */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleUndo}
+                        disabled={undoStack.length === 0}
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                      >
+                        <Undo2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Undo (Ctrl+Z)</TooltipContent>
+                  </Tooltip>
+                  
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={handleRedo}
+                        disabled={redoStack.length === 0}
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                      >
+                        <Redo2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Redo (Ctrl+Y)</TooltipContent>
+                  </Tooltip>
+                  
+                  <div className="h-4 w-px bg-border/50 mx-1" />
+                  
+                  <ComponentLibrary onAddComponent={(prompt) => handleMessageSubmit(prompt)} />
+                  
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleNewProject}
+                    className="text-muted-foreground hover:text-foreground hover:bg-white/10 h-8 gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="hidden md:inline">New</span>
+                  </Button>
+                  
+                  <ImageToCode 
+                    onGenerate={(prompt) => handleMessageSubmit(prompt)} 
+                    isGenerating={streaming.isGenerating}
+                  />
+                  
+                  <ExportOptions code={generatedContent?.preview || ""} files={generatedContent?.files} />
+                  
+                  <TemplateGallery onSelectTemplate={(prompt) => handleMessageSubmit(prompt)} />
+                  
+                  <ImageUploadPanel onInsertImage={(url) => {
                   // Insert image URL into the chat as context
                   handleMessageSubmit(`Use this image in my design: ${url}`);
                 }} />
@@ -632,7 +720,10 @@ const Index = () => {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                
+                <KeyboardShortcutsHelp />
               </div>
+              </TooltipProvider>
             )}
           </div>
           
@@ -805,6 +896,14 @@ const Index = () => {
               )}
             </div>
           </div>
+          
+          {/* Quick Action Bar - floating at bottom */}
+          {generatedContent?.preview && !streaming.isGenerating && (
+            <QuickActionBar 
+              onAction={(prompt) => handleMessageSubmit(prompt)}
+              disabled={streaming.isGenerating}
+            />
+          )}
         </main>
       )}
     </div>
