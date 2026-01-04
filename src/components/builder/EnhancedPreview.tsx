@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { PreviewToolbar } from "./PreviewToolbar";
 import { ConsolePanel } from "./ConsolePanel";
 import { MonacoEditor } from "./MonacoEditor";
+import { ElementSelectorPanel, SelectedElement } from "./ElementSelectorPanel";
 import { GenerationLoader } from "@/components/preview/GenerationLoader";
 import { Eye, CheckCircle, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -34,9 +35,10 @@ interface EnhancedPreviewProps {
   generationStatus?: string;
   generationProgress?: number;
   validation?: ValidationResult | null;
-  streamingPreview?: string; // Live preview during generation
-  activePage?: string; // Current active page path
-  onNavigate?: (path: string) => void; // Callback for page navigation
+  streamingPreview?: string;
+  activePage?: string;
+  onNavigate?: (path: string) => void;
+  onEditElement?: (prompt: string) => void; // New prop for element editing
 }
 
 const viewportDimensions = {
@@ -57,6 +59,7 @@ export const EnhancedPreview = ({
   streamingPreview,
   activePage = "/",
   onNavigate,
+  onEditElement,
 }: EnhancedPreviewProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
   const [showSplitView, setShowSplitView] = useState(false);
@@ -64,6 +67,8 @@ export const EnhancedPreview = ({
   const [consoleCollapsed, setConsoleCollapsed] = useState(true);
   const [iframeKey, setIframeKey] = useState(0);
   const [currentUrl, setCurrentUrl] = useState("/");
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastCodeRef = useRef("");
 
@@ -82,7 +87,7 @@ export const EnhancedPreview = ({
     }
   }, [cleanedHtml, isComplete]);
 
-  // Listen for messages from iframe (console, navigation, interactions)
+  // Listen for messages from iframe (console, navigation, interactions, element selection)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "console") {
@@ -122,11 +127,32 @@ export const EnhancedPreview = ({
           timestamp: new Date(),
         }]);
       }
+
+      // Handle element selection
+      if (event.data?.type === "element_selected") {
+        setSelectedElement(event.data.element);
+        console.log("[Preview] Element selected:", event.data.element);
+      }
+
+      // Handle element hover (for highlight feedback)
+      if (event.data?.type === "element_hover") {
+        // Could be used for showing element path in status bar
+      }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [onNavigate]);
+
+  // Send selection mode state to iframe
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'setSelectionMode',
+        enabled: isSelectionMode
+      }, '*');
+    }
+  }, [isSelectionMode, iframeKey]);
 
   const handleRefresh = useCallback(() => {
     setIframeKey((k) => k + 1);
@@ -209,9 +235,142 @@ export const EnhancedPreview = ({
   const displayCode = selectedFile?.content || cleanedHtml;
   const displayFileName = selectedFile?.name || "index.html";
 
-  // Interactive navigation script - intercepts clicks and handles internal navigation
+  // Interactive navigation script - intercepts clicks and handles internal navigation + element selection
   const interactiveScript = `
     <script>
+      // Selection mode state
+      let selectionModeEnabled = false;
+      let highlightedElement = null;
+      let highlightOverlay = null;
+      
+      // Create highlight overlay element
+      function createHighlightOverlay() {
+        if (highlightOverlay) return;
+        highlightOverlay = document.createElement('div');
+        highlightOverlay.id = 'element-highlight-overlay';
+        highlightOverlay.style.cssText = \`
+          position: fixed;
+          pointer-events: none;
+          border: 2px solid #8b5cf6;
+          background: rgba(139, 92, 246, 0.1);
+          z-index: 999999;
+          transition: all 0.1s ease;
+          border-radius: 4px;
+          display: none;
+        \`;
+        document.body.appendChild(highlightOverlay);
+        
+        // Add selection overlay info
+        const infoBox = document.createElement('div');
+        infoBox.id = 'element-info-box';
+        infoBox.style.cssText = \`
+          position: fixed;
+          background: #1a1a2e;
+          color: white;
+          padding: 4px 8px;
+          font-size: 11px;
+          font-family: monospace;
+          border-radius: 4px;
+          z-index: 1000000;
+          pointer-events: none;
+          display: none;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          border: 1px solid #8b5cf6;
+        \`;
+        document.body.appendChild(infoBox);
+      }
+      
+      // Get CSS selector path for element
+      function getCssPath(el) {
+        if (!el || el === document.body) return 'body';
+        
+        const parts = [];
+        while (el && el !== document.body) {
+          let selector = el.tagName.toLowerCase();
+          if (el.id) {
+            selector += '#' + el.id;
+            parts.unshift(selector);
+            break;
+          } else if (el.className && typeof el.className === 'string') {
+            const classes = el.className.trim().split(/\\s+/).filter(c => c && !c.startsWith('hover:')).slice(0, 2);
+            if (classes.length > 0) {
+              selector += '.' + classes.join('.');
+            }
+          }
+          parts.unshift(selector);
+          el = el.parentElement;
+        }
+        return parts.join(' > ');
+      }
+      
+      // Highlight element on hover
+      function highlightElement(el) {
+        if (!el || el === highlightedElement) return;
+        highlightedElement = el;
+        
+        if (!highlightOverlay) createHighlightOverlay();
+        
+        const rect = el.getBoundingClientRect();
+        highlightOverlay.style.display = 'block';
+        highlightOverlay.style.top = rect.top + 'px';
+        highlightOverlay.style.left = rect.left + 'px';
+        highlightOverlay.style.width = rect.width + 'px';
+        highlightOverlay.style.height = rect.height + 'px';
+        
+        // Update info box
+        const infoBox = document.getElementById('element-info-box');
+        if (infoBox) {
+          infoBox.style.display = 'block';
+          infoBox.style.top = Math.max(4, rect.top - 28) + 'px';
+          infoBox.style.left = rect.left + 'px';
+          infoBox.textContent = '<' + el.tagName.toLowerCase() + '>' + (el.id ? ' #' + el.id : '');
+        }
+        
+        parent.postMessage({ type: 'element_hover', path: getCssPath(el) }, '*');
+      }
+      
+      // Clear highlight
+      function clearHighlight() {
+        highlightedElement = null;
+        if (highlightOverlay) highlightOverlay.style.display = 'none';
+        const infoBox = document.getElementById('element-info-box');
+        if (infoBox) infoBox.style.display = 'none';
+      }
+      
+      // Handle element selection
+      function selectElement(el) {
+        const rect = el.getBoundingClientRect();
+        const styles = window.getComputedStyle(el);
+        
+        const elementData = {
+          tagName: el.tagName,
+          className: el.className || '',
+          id: el.id || '',
+          text: (el.textContent || '').trim().slice(0, 100),
+          path: getCssPath(el),
+          rect: {
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height
+          },
+          styles: {
+            backgroundColor: styles.backgroundColor,
+            color: styles.color,
+            fontSize: styles.fontSize,
+            padding: styles.padding
+          }
+        };
+        
+        parent.postMessage({ type: 'element_selected', element: elementData }, '*');
+        
+        // Visual feedback - change highlight to selected state
+        if (highlightOverlay) {
+          highlightOverlay.style.border = '3px solid #22c55e';
+          highlightOverlay.style.background = 'rgba(34, 197, 94, 0.15)';
+        }
+      }
+
       // Console interception
       ['log', 'warn', 'error', 'info'].forEach(level => {
         const original = console[level];
@@ -236,8 +395,35 @@ export const EnhancedPreview = ({
         }, '*');
       };
 
-      // Navigation interception - make internal links work within preview
+      // Mouse move handler for element highlighting
+      document.addEventListener('mousemove', function(e) {
+        if (!selectionModeEnabled) return;
+        
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        if (el && el !== document.body && el !== document.documentElement && 
+            el.id !== 'element-highlight-overlay' && el.id !== 'element-info-box') {
+          highlightElement(el);
+        }
+      }, true);
+      
+      document.addEventListener('mouseleave', function() {
+        if (selectionModeEnabled) clearHighlight();
+      });
+
+      // Click handler - selection mode takes priority
       document.addEventListener('click', function(e) {
+        if (selectionModeEnabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const el = document.elementFromPoint(e.clientX, e.clientY);
+          if (el && el !== document.body && el !== document.documentElement &&
+              el.id !== 'element-highlight-overlay' && el.id !== 'element-info-box') {
+            selectElement(el);
+          }
+          return false;
+        }
+        
         const link = e.target.closest('a');
         if (link) {
           const href = link.getAttribute('href');
@@ -258,7 +444,6 @@ export const EnhancedPreview = ({
             e.preventDefault();
             parent.postMessage({ type: 'navigation', path: href }, '*');
             
-            // Try to find and show the section
             const sectionId = href.replace('/', '').replace('.html', '');
             const section = document.getElementById(sectionId) || document.querySelector('[data-page="' + sectionId + '"]');
             if (section) {
@@ -276,15 +461,15 @@ export const EnhancedPreview = ({
         }
       }, true);
 
-      // Make buttons interactive
+      // Make buttons interactive (only when not in selection mode)
       document.addEventListener('click', function(e) {
+        if (selectionModeEnabled) return;
+        
         const button = e.target.closest('button');
         if (button && !button.disabled) {
-          // Add click feedback
           button.style.transform = 'scale(0.98)';
           setTimeout(() => { button.style.transform = ''; }, 100);
           
-          // Notify parent of button click
           parent.postMessage({ 
             type: 'interaction', 
             element: 'button', 
@@ -295,6 +480,8 @@ export const EnhancedPreview = ({
 
       // Form submission handling
       document.addEventListener('submit', function(e) {
+        if (selectionModeEnabled) return;
+        
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
@@ -305,7 +492,6 @@ export const EnhancedPreview = ({
           data: data
         }, '*');
         
-        // Show success feedback
         const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
         if (submitBtn) {
           const originalText = submitBtn.textContent;
@@ -330,13 +516,24 @@ export const EnhancedPreview = ({
         });
       });
 
-      // Listen for scroll commands from parent (Pages panel navigation)
+      // Listen for commands from parent
       window.addEventListener('message', function(e) {
         if (e.data?.type === 'scrollTo' && e.data.target) {
           const target = document.querySelector(e.data.target);
           if (target) {
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
+        }
+        
+        // Toggle selection mode
+        if (e.data?.type === 'setSelectionMode') {
+          selectionModeEnabled = e.data.enabled;
+          if (!selectionModeEnabled) {
+            clearHighlight();
+          } else {
+            createHighlightOverlay();
+          }
+          document.body.style.cursor = selectionModeEnabled ? 'crosshair' : '';
         }
       });
     </script>`;
@@ -460,10 +657,10 @@ export const EnhancedPreview = ({
           <div className="flex-1 overflow-auto p-4 bg-[#0f0f0f]">
             <div className="flex items-start justify-center min-h-full">
               <div
-                className="bg-white rounded-xl shadow-2xl transition-all duration-300 overflow-hidden border border-border/20"
+                className={`bg-white rounded-xl shadow-2xl transition-all duration-300 overflow-hidden ${isSelectionMode ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#0f0f0f]' : 'border border-border/20'}`}
                 style={{
                   width: viewportDimensions[viewport].width,
-                  height: viewport === "desktop" ? "calc(100vh - 280px)" : viewportDimensions[viewport].height,
+                  height: viewport === "desktop" ? "calc(100vh - 340px)" : viewportDimensions[viewport].height,
                   maxWidth: "100%",
                 }}
               >
@@ -479,6 +676,35 @@ export const EnhancedPreview = ({
               </div>
             </div>
           </div>
+
+          {/* Element Selector Panel */}
+          {!isGenerating && (
+            <ElementSelectorPanel
+              selectedElement={selectedElement}
+              isSelectionMode={isSelectionMode}
+              onToggleSelectionMode={() => {
+                setIsSelectionMode(!isSelectionMode);
+                if (isSelectionMode) {
+                  setSelectedElement(null);
+                }
+              }}
+              onClearSelection={() => {
+                setSelectedElement(null);
+                // Reset highlight in iframe
+                if (iframeRef.current?.contentWindow) {
+                  iframeRef.current.contentWindow.postMessage({
+                    type: 'setSelectionMode',
+                    enabled: isSelectionMode
+                  }, '*');
+                }
+              }}
+              onEditElement={(prompt) => {
+                onEditElement?.(prompt);
+                setSelectedElement(null);
+                setIsSelectionMode(false);
+              }}
+            />
+          )}
 
           {/* Console Panel */}
           <ConsolePanel
