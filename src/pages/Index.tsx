@@ -16,6 +16,8 @@ import { PublishDialog } from "@/components/builder/PublishDialog";
 import { ImageToCode } from "@/components/builder/ImageToCode";
 import { QuickActionBar } from "@/components/builder/QuickActionBar";
 import { KeyboardShortcutsHelp } from "@/components/builder/KeyboardShortcutsHelp";
+import { SEOEditor, SEOData } from "@/components/builder/SEOEditor";
+import { AssetLibrary } from "@/components/builder/AssetLibrary";
 import { CreditsDisplay } from "@/components/credits/CreditsDisplay";
 import { Footer } from "@/components/layout/Footer";
 import { useCredits } from "@/hooks/useCredits";
@@ -99,6 +101,20 @@ const Index = () => {
   const [showPagesPanel, setShowPagesPanel] = useState(true);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
+  const [seoData, setSeoData] = useState<SEOData>({
+    title: "",
+    description: "",
+    keywords: "",
+    ogTitle: "",
+    ogDescription: "",
+    ogImage: "",
+    twitterCard: "summary_large_image",
+    twitterTitle: "",
+    twitterDescription: "",
+    twitterImage: "",
+    favicon: "",
+    canonicalUrl: "",
+  });
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -677,12 +693,47 @@ const Index = () => {
                   
                   <TemplateGallery onSelectTemplate={(prompt) => handleMessageSubmit(prompt)} />
                   
-                  <ImageUploadPanel onInsertImage={(url) => {
-                  // Insert image URL into the chat as context
+                <AssetLibrary onInsertImage={(url) => {
                   handleMessageSubmit(`Use this image in my design: ${url}`);
                 }} />
                 
-                <VersionHistory 
+                <SEOEditor 
+                  seoData={seoData}
+                  onSave={setSeoData}
+                  onApplyToCode={(data) => {
+                    // Inject SEO meta tags into the preview
+                    if (generatedContent?.preview) {
+                      const metaTags = `
+    <title>${data.title}</title>
+    <meta name="description" content="${data.description}">
+    <meta name="keywords" content="${data.keywords}">
+    <meta property="og:title" content="${data.ogTitle || data.title}">
+    <meta property="og:description" content="${data.ogDescription || data.description}">
+    <meta property="og:image" content="${data.ogImage}">
+    <meta name="twitter:card" content="${data.twitterCard}">
+    <meta name="twitter:title" content="${data.twitterTitle || data.ogTitle || data.title}">
+    <meta name="twitter:description" content="${data.twitterDescription || data.ogDescription || data.description}">
+    <meta name="twitter:image" content="${data.twitterImage || data.ogImage}">
+    ${data.canonicalUrl ? `<link rel="canonical" href="${data.canonicalUrl}">` : ''}
+    ${data.favicon ? `<link rel="icon" href="${data.favicon}">` : ''}`;
+                      
+                      let updatedPreview = generatedContent.preview;
+                      if (updatedPreview.includes('<head>')) {
+                        updatedPreview = updatedPreview.replace('<head>', `<head>${metaTags}`);
+                      } else if (updatedPreview.includes('<html>')) {
+                        updatedPreview = updatedPreview.replace('<html>', `<html>\n<head>${metaTags}\n</head>`);
+                      }
+                      
+                      setGeneratedContent({
+                        ...generatedContent,
+                        preview: updatedPreview,
+                      });
+                      toast({ title: "SEO tags applied", description: "Meta tags have been added to your page" });
+                    }
+                  }}
+                />
+                
+                <VersionHistory
                   projectId={projectId}
                   onGetVersions={getProjectVersions}
                   onRestore={restoreVersion}

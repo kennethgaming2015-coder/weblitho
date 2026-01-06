@@ -3,12 +3,12 @@ import { PreviewToolbar } from "./PreviewToolbar";
 import { ConsolePanel } from "./ConsolePanel";
 import { MonacoEditor } from "./MonacoEditor";
 import { ElementSelectorPanel, SelectedElement } from "./ElementSelectorPanel";
+import { ResponsivePreviewToolbar, ResponsiveFrame, ViewportSize } from "./ResponsivePreview";
 import { GenerationLoader } from "@/components/preview/GenerationLoader";
-import { Eye, CheckCircle, AlertTriangle } from "lucide-react";
+import { Eye, CheckCircle, AlertTriangle, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ProjectFile } from "@/hooks/useProjects";
-
-type ViewportSize = "desktop" | "tablet" | "mobile";
 
 interface ConsoleLog {
   id: string;
@@ -62,6 +62,7 @@ export const EnhancedPreview = ({
   onEditElement,
 }: EnhancedPreviewProps) => {
   const [viewport, setViewport] = useState<ViewportSize>("desktop");
+  const [isRotated, setIsRotated] = useState(false);
   const [showSplitView, setShowSplitView] = useState(false);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [consoleCollapsed, setConsoleCollapsed] = useState(true);
@@ -69,6 +70,7 @@ export const EnhancedPreview = ({
   const [currentUrl, setCurrentUrl] = useState("/");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastCodeRef = useRef("");
 
@@ -592,7 +594,7 @@ export const EnhancedPreview = ({
         </div>
       )}
 
-      {/* Header with validation badge */}
+      {/* Header with validation badge and responsive controls */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-border/30">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-cyan-500 to-blue-500">
@@ -625,6 +627,27 @@ export const EnhancedPreview = ({
             </Badge>
           )}
         </div>
+        
+        {/* Responsive Preview Controls */}
+        <div className="flex items-center gap-3">
+          <ResponsivePreviewToolbar
+            viewport={viewport}
+            onViewportChange={setViewport}
+            isRotated={isRotated}
+            onRotate={() => setIsRotated(!isRotated)}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+          />
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -652,30 +675,21 @@ export const EnhancedPreview = ({
           </div>
         )}
 
-        {/* Preview */}
-        <div className={`${showSplitView ? 'w-1/2' : 'flex-1'} flex flex-col overflow-hidden`}>
-          <div className="flex-1 overflow-auto p-4 bg-[#0f0f0f]">
-            <div className="flex items-start justify-center min-h-full">
-              <div
-                className={`bg-white rounded-xl shadow-2xl transition-all duration-300 overflow-hidden ${isSelectionMode ? 'ring-2 ring-primary ring-offset-2 ring-offset-[#0f0f0f]' : 'border border-border/20'}`}
-                style={{
-                  width: viewportDimensions[viewport].width,
-                  height: viewport === "desktop" ? "calc(100vh - 340px)" : viewportDimensions[viewport].height,
-                  maxWidth: "100%",
-                }}
-              >
-                <iframe
-                  ref={iframeRef}
-                  key={iframeKey}
-                  srcDoc={finalIframeContent}
-                  title="Preview"
-                  className="w-full h-full border-none"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                  style={{ pointerEvents: 'auto' }}
-                />
-              </div>
+        {/* Preview with Device Frames */}
+        <div className={`${showSplitView ? 'w-1/2' : 'flex-1'} flex flex-col overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 bg-[#0f0f0f]' : ''}`}>
+          <ResponsiveFrame viewport={viewport} isRotated={isRotated} className="flex-1 bg-[#0f0f0f]">
+            <div className={`w-full h-full ${isSelectionMode ? 'ring-2 ring-primary' : ''}`}>
+              <iframe
+                ref={iframeRef}
+                key={iframeKey}
+                srcDoc={finalIframeContent}
+                title="Preview"
+                className="w-full h-full border-none bg-white"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                style={{ pointerEvents: 'auto' }}
+              />
             </div>
-          </div>
+          </ResponsiveFrame>
 
           {/* Element Selector Panel */}
           {!isGenerating && (
