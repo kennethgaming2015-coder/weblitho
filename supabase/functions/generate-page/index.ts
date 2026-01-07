@@ -499,7 +499,7 @@ Remember: You're here to DISCUSS, not to generate code.`;
 }
 
 // =============================================
-// GENERATION PROMPT - PROFESSIONAL WEBSITE
+// GENERATION PROMPT - PROFESSIONAL MULTI-FILE WEBSITE
 // =============================================
 function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: ConversationContext): string {
   const websiteTypeContext = intent.websiteType 
@@ -508,35 +508,73 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
       ? getWebsiteTypeContext(context.projectContext.websiteType)
       : "";
 
-  return `You are Weblitho, an elite AI website builder creating STUNNING, PRODUCTION-READY websites that rival top agencies.
+  return `You are Weblitho, an elite AI website builder creating STUNNING, PRODUCTION-READY websites with PROPER FILE STRUCTURE like real development projects.
 
 ## YOUR MISSION
-Create a complete, beautiful, fully-functional website. Output quality should match Vercel, Linear, or Stripe's marketing sites.
+Create a complete, beautiful website with MULTIPLE SEPARATE FILES like a real React/Next.js project. Each component must be in its own file. This is NOT a single HTML file - it's a proper codebase.
 
-## CRITICAL OUTPUT FORMAT
-You MUST output ONLY valid JSON. No markdown, no code blocks, no explanations before or after.
+## CRITICAL OUTPUT FORMAT - MULTI-FILE PROJECT
+You MUST output ONLY valid JSON with TWO things:
+1. "files" - Array of ALL project files (THIS IS REQUIRED - MINIMUM 12 FILES)
+2. "preview" - A standalone HTML version for iframe preview
+
+START YOUR OUTPUT WITH { - NO markdown, NO explanations, JUST JSON.
 
 {
-  "preview": "<!DOCTYPE html>...COMPLETE STANDALONE HTML...",
   "files": [
-    { "path": "app/layout.tsx", "content": "..." },
-    { "path": "app/page.tsx", "content": "..." },
-    { "path": "components/Navbar.tsx", "content": "..." },
-    { "path": "components/Hero.tsx", "content": "..." },
-    { "path": "components/Features.tsx", "content": "..." },
-    { "path": "components/Testimonials.tsx", "content": "..." },
-    { "path": "components/Pricing.tsx", "content": "..." },
-    { "path": "components/FAQ.tsx", "content": "..." },
-    { "path": "components/CTA.tsx", "content": "..." },
-    { "path": "components/Footer.tsx", "content": "..." }
-  ]
+    { "path": "package.json", "content": "{ \\"name\\": \\"my-website\\", \\"version\\": \\"1.0.0\\", \\"dependencies\\": { \\"react\\": \\"^18.2.0\\", \\"react-dom\\": \\"^18.2.0\\", \\"tailwindcss\\": \\"^3.4.0\\", \\"framer-motion\\": \\"^11.0.0\\" } }" },
+    { "path": "tailwind.config.js", "content": "module.exports = { content: ['./src/**/*.{js,ts,jsx,tsx}'], theme: { extend: {} }, plugins: [] }" },
+    { "path": "src/index.css", "content": "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;" },
+    { "path": "src/App.tsx", "content": "import Navbar from './components/Navbar';\\nimport Hero from './components/Hero';\\n// ... more imports\\nexport default function App() { return (<><Navbar /><Hero />...</>); }" },
+    { "path": "src/components/Navbar.tsx", "content": "export default function Navbar() { return (...); }" },
+    { "path": "src/components/Hero.tsx", "content": "export default function Hero() { return (...); }" },
+    { "path": "src/components/Features.tsx", "content": "export default function Features() { return (...); }" },
+    { "path": "src/components/SocialProof.tsx", "content": "export default function SocialProof() { return (...); }" },
+    { "path": "src/components/HowItWorks.tsx", "content": "export default function HowItWorks() { return (...); }" },
+    { "path": "src/components/Testimonials.tsx", "content": "export default function Testimonials() { return (...); }" },
+    { "path": "src/components/Pricing.tsx", "content": "export default function Pricing() { return (...); }" },
+    { "path": "src/components/FAQ.tsx", "content": "export default function FAQ() { return (...); }" },
+    { "path": "src/components/CTA.tsx", "content": "export default function CTA() { return (...); }" },
+    { "path": "src/components/Footer.tsx", "content": "export default function Footer() { return (...); }" }
+  ],
+  "preview": "<!DOCTYPE html>...COMPLETE STANDALONE HTML FOR PREVIEW..."
 }
+
+## MANDATORY FILE STRUCTURE (GENERATE ALL OF THESE)
+You MUST generate these files with FULL, COMPLETE code:
+
+### Config Files
+1. package.json - Project dependencies
+2. tailwind.config.js - Tailwind configuration
+3. tsconfig.json - TypeScript config
+
+### Source Files  
+4. src/index.css - Global styles with Tailwind directives
+5. src/main.tsx - Entry point
+6. src/App.tsx - Main app component importing all sections
+
+### Component Files (Each in separate file!)
+7. src/components/Navbar.tsx - Navigation with mobile menu
+8. src/components/Hero.tsx - Hero section
+9. src/components/SocialProof.tsx - Logo cloud / trusted by
+10. src/components/Features.tsx - Feature cards grid
+11. src/components/HowItWorks.tsx - Steps/process section
+12. src/components/Testimonials.tsx - Customer reviews
+13. src/components/Pricing.tsx - Pricing tiers
+14. src/components/FAQ.tsx - Accordion FAQ
+15. src/components/CTA.tsx - Call to action
+16. src/components/Footer.tsx - Footer with links
+
+### Optional Additional Files
+- src/components/ui/Button.tsx - Reusable button
+- src/components/ui/Card.tsx - Reusable card
+- src/hooks/useScrollAnimation.ts - Animation hook
+- src/lib/utils.ts - Utility functions
 
 ## USER REQUEST
 "${userPrompt}"
 ${websiteTypeContext}
 
-## REQUIRED SECTIONS (ALL MANDATORY)
 
 ### 1. Navigation Bar
 - Fixed/sticky at top with backdrop blur
@@ -731,7 +769,18 @@ ${websiteTypeContext}
 - FAQ accordion expand/collapse
 - Mobile menu toggle
 
-NOW GENERATE THE COMPLETE WEBSITE JSON with high-quality, production-ready code.`;
+## FINAL REMINDER - MULTI-FILE OUTPUT IS MANDATORY
+You MUST generate the "files" array with AT LEAST 12 separate component files. This is not optional.
+The output must have this structure:
+{
+  "files": [... AT LEAST 12 FILES WITH FULL CODE ...],
+  "preview": "<!DOCTYPE html>...COMPLETE HTML..."
+}
+
+Each file in the array must have COMPLETE, WORKING code - not placeholders or "..." shortcuts.
+Generate the React components with proper TypeScript, imports, and exports.
+
+START YOUR OUTPUT WITH { - NO other text before or after the JSON.`;
 }
 
 // =============================================
@@ -752,7 +801,7 @@ function buildModificationPrompt(currentCode: string, intent: Intent, userPrompt
 ## OUTPUT FORMAT
 {
   "files": [
-    { "path": "components/Hero.tsx", "content": "...MODIFIED CODE..." }
+    { "path": "src/components/Hero.tsx", "content": "...MODIFIED CODE..." }
   ],
   "preview": "<!DOCTYPE html>...COMPLETE HTML WITH CHANGES..."
 }
@@ -768,29 +817,29 @@ ${affectedAreas}
 ${currentCode}
 
 ## IMPORTANT RULES
-- In "files", ONLY include files that you actually changed
-- If changing colors in Hero, only return the Hero.tsx file
-- If adding a section, return the new component AND updated page.tsx
+- In "files", ONLY include files that you actually changed (use src/components/ path)
+- If changing colors in Hero, only return the src/components/Hero.tsx file
+- If adding a section, return the new component AND updated src/App.tsx
 - The "preview" must be the COMPLETE HTML with your changes applied
 - Maintain all existing animations, hover effects, and interactions
 - DO NOT remove any existing functionality
 - DO NOT change the overall theme unless specifically asked
 
-Apply the modification and return the JSON now.`;
+START YOUR OUTPUT WITH { - NO other text before or after the JSON.`;
 }
 
 function getAffectedAreas(intent: Intent, prompt: string): string {
   const lower = prompt.toLowerCase();
   const areas: string[] = [];
   
-  if (lower.includes("hero") || lower.includes("header") || lower.includes("banner")) areas.push("Hero section (components/Hero.tsx)");
-  if (lower.includes("nav") || lower.includes("menu")) areas.push("Navigation (components/Navbar.tsx)");
-  if (lower.includes("footer")) areas.push("Footer (components/Footer.tsx)");
-  if (lower.includes("feature")) areas.push("Features section (components/Features.tsx)");
-  if (lower.includes("pricing")) areas.push("Pricing section (components/Pricing.tsx)");
-  if (lower.includes("testimonial") || lower.includes("review")) areas.push("Testimonials (components/Testimonials.tsx)");
-  if (lower.includes("cta") || lower.includes("call to action")) areas.push("CTA section (components/CTA.tsx)");
-  if (lower.includes("faq")) areas.push("FAQ section (components/FAQ.tsx)");
+  if (lower.includes("hero") || lower.includes("header") || lower.includes("banner")) areas.push("Hero section (src/components/Hero.tsx)");
+  if (lower.includes("nav") || lower.includes("menu")) areas.push("Navigation (src/components/Navbar.tsx)");
+  if (lower.includes("footer")) areas.push("Footer (src/components/Footer.tsx)");
+  if (lower.includes("feature")) areas.push("Features section (src/components/Features.tsx)");
+  if (lower.includes("pricing")) areas.push("Pricing section (src/components/Pricing.tsx)");
+  if (lower.includes("testimonial") || lower.includes("review")) areas.push("Testimonials (src/components/Testimonials.tsx)");
+  if (lower.includes("cta") || lower.includes("call to action")) areas.push("CTA section (src/components/CTA.tsx)");
+  if (lower.includes("faq")) areas.push("FAQ section (src/components/FAQ.tsx)");
   if (lower.includes("color") || lower.includes("theme") || lower.includes("style")) areas.push("Apply color/style changes to affected components only");
   if (lower.includes("animation") || lower.includes("hover")) areas.push("Add animations to specified elements only");
   
