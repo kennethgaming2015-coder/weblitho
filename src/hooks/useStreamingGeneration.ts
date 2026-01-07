@@ -446,85 +446,90 @@ function extractOutput(text: string): ExtractedOutput {
   
   cleaned = cleaned.trim();
 
-  // Try to parse as JSON with files and pages arrays
+  // Try to parse as JSON with files array (PRIMARY METHOD)
   try {
     // Find the JSON object boundaries
     const jsonStart = cleaned.indexOf('{');
-    const jsonEnd = cleaned.lastIndexOf('}');
+    let jsonEnd = cleaned.lastIndexOf('}');
     
     if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
-      const jsonStr = cleaned.slice(jsonStart, jsonEnd + 1);
+      let jsonStr = cleaned.slice(jsonStart, jsonEnd + 1);
+      
+      // Try to fix incomplete JSON by balancing brackets
+      const openBrackets = (jsonStr.match(/{/g) || []).length;
+      const closeBrackets = (jsonStr.match(/}/g) || []).length;
+      
+      if (openBrackets > closeBrackets) {
+        // Add missing closing brackets
+        jsonStr += '}'.repeat(openBrackets - closeBrackets);
+      }
       
       // Parse the JSON
       const parsed = JSON.parse(jsonStr);
       
-      // Extract files array
+      // Extract files array - THIS IS THE MAIN OUTPUT
       let files: ProjectFile[] = [];
       if (Array.isArray(parsed.files)) {
         files = parsed.files
           .filter((f: any) => f && typeof f.path === 'string' && typeof f.content === 'string')
           .map((f: any) => ({
             path: f.path,
-            content: f.content
+            content: unescapeJsonString(f.content)
           }));
+        console.log(`Extracted ${files.length} files from JSON output`);
       }
       
-      // Extract pages array - NEW MULTI-PAGE SUPPORT
+      // Extract pages array
       let pages: GeneratedPage[] = [];
       if (Array.isArray(parsed.pages)) {
         pages = parsed.pages
           .filter((p: any) => p && typeof p.id === 'string' && typeof p.name === 'string')
-          .map((p: any) => {
-            let pagePreview = p.preview || "";
-            if (typeof pagePreview === 'string') {
-              pagePreview = pagePreview
-                .replace(/\\n/g, '\n')
-                .replace(/\\"/g, '"')
-                .replace(/\\t/g, '\t')
-                .replace(/\\\\/g, '\\');
-            }
-            return {
-              id: p.id,
-              name: p.name,
-              path: p.path || '/',
-              preview: pagePreview,
-              icon: p.icon || getIconForPath(p.path),
-              files: p.files
-            };
-          });
+          .map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            path: p.path || '/',
+            preview: unescapeJsonString(p.preview || ""),
+            icon: p.icon || getIconForPath(p.path),
+            files: p.files
+          }));
         console.log(`Extracted ${pages.length} pages from JSON output`);
       }
       
-      // Extract preview HTML (use first page preview or main preview)
+      // Extract preview HTML
       let preview = "";
       if (typeof parsed.preview === 'string') {
-        preview = parsed.preview
-          .replace(/\\n/g, '\n')
-          .replace(/\\"/g, '"')
-          .replace(/\\t/g, '\t')
-          .replace(/\\\\/g, '\\');
+        preview = unescapeJsonString(parsed.preview);
       } else if (pages.length > 0 && pages[0].preview) {
-        // Use home page preview as main preview
         preview = pages[0].preview;
       }
       
+      // If we got files, return them
       if (files.length > 0 || pages.length > 0 || preview.includes("<!DOCTYPE html>")) {
-        console.log(`Extracted ${files.length} files, ${pages.length} pages from JSON output`);
+        console.log(`Successfully extracted: ${files.length} files, ${pages.length} pages`);
         return { preview: preview || wrapInHtml("No preview available"), files, pages };
       }
     }
   } catch (e) {
-    console.log("JSON parse failed, falling back to HTML extraction:", e);
+    console.log("JSON parse failed, trying partial extraction:", e);
+  }
+
+  // Try to extract files array from partial/malformed JSON
+  const filesResult = extractFilesFromPartialJson(cleaned);
+  if (filesResult.length > 0) {
+    console.log(`Extracted ${filesResult.length} files from partial JSON`);
+    // Try to get preview too
+    const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*[,}]|\s*$)/);
+    let preview = "";
+    if (previewMatch) {
+      preview = unescapeJsonString(previewMatch[1]);
+    }
+    return { preview: preview || wrapInHtml("Files generated successfully"), files: filesResult, pages: [] };
   }
 
   // Fallback: Try to extract preview from partial JSON
   const previewMatch = cleaned.match(/"preview"\s*:\s*"([\s\S]*?)(?:"\s*[,}]|\s*$)/);
   if (previewMatch) {
-    let htmlFromJson = previewMatch[1];
-    htmlFromJson = htmlFromJson.replace(/\\n/g, '\n');
-    htmlFromJson = htmlFromJson.replace(/\\"/g, '"');
-    htmlFromJson = htmlFromJson.replace(/\\t/g, '\t');
-    htmlFromJson = htmlFromJson.replace(/\\\\/g, '\\');
+    let htmlFromJson = unescapeJsonString(previewMatch[1]);
     if (htmlFromJson.includes("<!DOCTYPE html>")) {
       return { preview: htmlFromJson, files: [], pages: [] };
     }
@@ -544,6 +549,37 @@ function extractOutput(text: string): ExtractedOutput {
   if (htmlIdx !== -1) return { preview: "<!DOCTYPE html>\n" + cleaned.slice(htmlIdx), files: [], pages: [] };
 
   return { preview: "", files: [], pages: [] };
+}
+
+// Helper to unescape JSON string content
+function unescapeJsonString(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\');
+}
+
+// Extract files from partial/incomplete JSON
+function extractFilesFromPartialJson(text: string): ProjectFile[] {
+  const files: ProjectFile[] = [];
+  
+  // Match individual file objects: { "path": "...", "content": "..." }
+  const filePattern = /\{\s*"path"\s*:\s*"([^"]+)"\s*,\s*"content"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+  
+  let match;
+  while ((match = filePattern.exec(text)) !== null) {
+    const path = match[1];
+    const content = unescapeJsonString(match[2]);
+    
+    if (path && content && content.length > 10) {
+      files.push({ path, content });
+    }
+  }
+  
+  return files;
 }
 
 // Get icon name based on path
