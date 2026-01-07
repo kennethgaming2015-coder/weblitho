@@ -332,8 +332,17 @@ export function useStreamingGeneration() {
       const output = extractOutput(accumulatedTextRef.current);
       const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
+      console.log(`Generation complete: ${output.files.length} files extracted`);
+      
+      // If AI didn't return proper files array, generate component files from HTML
+      let finalFiles = output.files;
+      if (finalFiles.length === 0 && output.preview) {
+        console.log("No files from AI - generating component structure from HTML");
+        finalFiles = generateFilesFromHtml(output.preview);
+      }
+      
       // Merge modified files with existing files (don't replace all)
-      const mergedFiles = mergeFiles(currentFiles || [], output.files);
+      const mergedFiles = mergeFiles(currentFiles || [], finalFiles);
       
       // Use pages from output, or create default home page
       const extractedPages = output.pages.length > 0 ? output.pages : [{
@@ -639,4 +648,154 @@ function wrapInHtml(content: string): string {
   ${content}
 </body>
 </html>`;
+}
+
+// Generate component files from HTML when AI doesn't return proper file structure
+function generateFilesFromHtml(html: string): ProjectFile[] {
+  const files: ProjectFile[] = [];
+  
+  // Extract sections from HTML by looking for common patterns
+  const sectionPatterns = [
+    { name: 'Navbar', regex: /<nav[^>]*>[\s\S]*?<\/nav>/gi },
+    { name: 'Hero', regex: /<(?:section|div)[^>]*(?:id=["']hero["']|class="[^"]*hero[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
+    { name: 'Features', regex: /<(?:section|div)[^>]*(?:id=["']features["']|class="[^"]*features?[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
+    { name: 'Pricing', regex: /<(?:section|div)[^>]*(?:id=["']pricing["']|class="[^"]*pricing[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
+    { name: 'Testimonials', regex: /<(?:section|div)[^>]*(?:id=["']testimonials["']|class="[^"]*testimonials?[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
+    { name: 'FAQ', regex: /<(?:section|div)[^>]*(?:id=["']faq["']|class="[^"]*faq[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
+    { name: 'CTA', regex: /<(?:section|div)[^>]*(?:id=["']cta["']|class="[^"]*cta[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
+    { name: 'Footer', regex: /<footer[^>]*>[\s\S]*?<\/footer>/gi },
+  ];
+  
+  const extractedSections: { name: string; content: string }[] = [];
+  
+  // Try to extract each section
+  for (const pattern of sectionPatterns) {
+    const match = html.match(pattern.regex);
+    if (match && match[0]) {
+      extractedSections.push({ name: pattern.name, content: match[0] });
+    }
+  }
+  
+  // Extract styles
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const styles = styleMatch ? styleMatch[1] : '';
+  
+  // Generate package.json
+  files.push({
+    path: 'package.json',
+    content: JSON.stringify({
+      name: "weblitho-project",
+      version: "1.0.0",
+      type: "module",
+      scripts: { dev: "vite", build: "vite build", preview: "vite preview" },
+      dependencies: { "react": "^18.2.0", "react-dom": "^18.2.0" },
+      devDependencies: {
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "@vitejs/plugin-react": "^4.2.0",
+        "autoprefixer": "^10.4.16",
+        "postcss": "^8.4.32",
+        "tailwindcss": "^3.4.0",
+        "typescript": "^5.3.0",
+        "vite": "^5.0.0"
+      }
+    }, null, 2)
+  });
+  
+  // Generate tailwind.config.js
+  files.push({
+    path: 'tailwind.config.js',
+    content: `/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+  theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } },
+  plugins: [],
+}`
+  });
+  
+  // Generate vite.config.ts
+  files.push({
+    path: 'vite.config.ts',
+    content: `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+export default defineConfig({ plugins: [react()] })`
+  });
+  
+  // Generate tsconfig.json
+  files.push({
+    path: 'tsconfig.json',
+    content: JSON.stringify({
+      compilerOptions: {
+        target: "ES2020", useDefineForClassFields: true,
+        lib: ["ES2020", "DOM", "DOM.Iterable"], module: "ESNext",
+        skipLibCheck: true, moduleResolution: "bundler",
+        allowImportingTsExtensions: true, resolveJsonModule: true,
+        isolatedModules: true, noEmit: true, jsx: "react-jsx", strict: true
+      },
+      include: ["src"]
+    }, null, 2)
+  });
+  
+  // Generate index.html
+  files.push({
+    path: 'index.html',
+    content: `<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Weblitho Project</title></head>
+  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+</html>`
+  });
+  
+  // Generate src/index.css
+  files.push({
+    path: 'src/index.css',
+    content: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n${styles}\n\nbody { font-family: 'Inter', system-ui, sans-serif; }`
+  });
+  
+  // Generate src/main.tsx
+  files.push({
+    path: 'src/main.tsx',
+    content: `import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode><App /></React.StrictMode>
+)`
+  });
+  
+  // Generate component files
+  const componentImports: string[] = [];
+  const componentUsage: string[] = [];
+  
+  for (const section of extractedSections) {
+    componentImports.push(`import ${section.name} from './components/${section.name}'`);
+    componentUsage.push(`      <${section.name} />`);
+    
+    // Escape the content for JSX
+    const escapedContent = section.content
+      .replace(/\{/g, '{"{"}')
+      .replace(/\}/g, '{"}"}'  );
+    
+    files.push({
+      path: `src/components/${section.name}.tsx`,
+      content: `export default function ${section.name}() {
+  return (
+    <div dangerouslySetInnerHTML={{ __html: \`${section.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\` }} />
+  )
+}`
+    });
+  }
+  
+  // Generate src/App.tsx
+  const appContent = componentImports.length > 0 
+    ? `${componentImports.join('\n')}\n\nexport default function App() {\n  return (\n    <div className="min-h-screen bg-[#030305] text-white">\n${componentUsage.join('\n')}\n    </div>\n  )\n}`
+    : `export default function App() {\n  return (\n    <div className="min-h-screen bg-[#030305] text-white" dangerouslySetInnerHTML={{ __html: \`${html.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\` }} />\n  )\n}`;
+  
+  files.push({ path: 'src/App.tsx', content: appContent });
+  
+  console.log(`Generated ${files.length} files from HTML (extracted ${extractedSections.length} sections)`);
+  
+  return files;
 }
