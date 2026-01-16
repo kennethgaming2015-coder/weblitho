@@ -39,60 +39,81 @@ export function StreamingIndicator({ status, statusType, progress, tokensGenerat
     <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className={`h-8 w-8 rounded-lg bg-gradient-to-br ${gradientColor} flex items-center justify-center shadow-lg`}>
-            <Icon className={`h-4 w-4 text-white ${!isComplete ? 'animate-spin' : ''}`} />
+        <div className="flex items-center gap-3">
+          <div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${gradientColor} flex items-center justify-center shadow-lg`}>
+            <Icon className={`h-5 w-5 text-white ${!isComplete ? 'animate-spin' : ''}`} />
           </div>
           <div>
-            <p className="text-sm font-medium text-foreground">{status}</p>
-            {tokensGenerated !== undefined && tokensGenerated > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {tokensGenerated.toLocaleString()} tokens generated
-              </p>
-            )}
+            <p className="text-sm font-semibold text-foreground">{status}</p>
+            <p className="text-xs text-muted-foreground">
+              {tokensGenerated !== undefined && tokensGenerated > 0 
+                ? `${tokensGenerated.toLocaleString()} tokens • Generating multi-file project`
+                : 'Creating React components...'}
+            </p>
           </div>
         </div>
         
-        <span className={`text-sm font-semibold bg-gradient-to-r ${gradientColor} bg-clip-text text-transparent`}>
-          {Math.round(progress)}%
-        </span>
+        <div className="text-right">
+          <span className={`text-lg font-bold bg-gradient-to-r ${gradientColor} bg-clip-text text-transparent`}>
+            {Math.round(progress)}%
+          </span>
+        </div>
       </div>
 
       {/* Progress bar */}
-      <div className="relative">
-        <Progress value={progress} className="h-2 bg-muted/50" />
+      <div className="relative h-2 rounded-full bg-muted/50 overflow-hidden">
         <div 
-          className={`absolute inset-0 h-2 rounded-full bg-gradient-to-r ${gradientColor} transition-all duration-300`}
+          className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${gradientColor} transition-all duration-300 ease-out`}
           style={{ width: `${progress}%` }}
+        />
+        <div 
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
+          style={{ backgroundSize: '200% 100%' }}
         />
       </div>
 
       {/* Phase indicators */}
-      <div className="flex justify-between mt-3 px-1">
-        {["Analyze", "Plan", "Build", "Style", "Done"].map((phase, index) => {
+      <div className="flex justify-between mt-4 px-1">
+        {[
+          { name: "Analyze", icon: "🔍" },
+          { name: "Plan", icon: "📋" },
+          { name: "Build", icon: "🛠️" },
+          { name: "Style", icon: "🎨" },
+          { name: "Done", icon: "✅" }
+        ].map((phase, index) => {
           const phaseProgress = (index + 1) * 20;
           const isActive = progress >= phaseProgress - 20 && progress < phaseProgress;
           const isCompleted = progress >= phaseProgress;
           
           return (
-            <div key={phase} className="flex flex-col items-center">
+            <div key={phase.name} className="flex flex-col items-center gap-1">
               <div 
-                className={`h-1.5 w-1.5 rounded-full transition-all ${
-                  isCompleted ? 'bg-primary scale-125' : 
-                  isActive ? 'bg-primary/50 animate-pulse' : 
-                  'bg-muted-foreground/30'
+                className={`h-6 w-6 rounded-lg flex items-center justify-center text-xs transition-all ${
+                  isCompleted ? 'bg-primary/20 scale-110' : 
+                  isActive ? 'bg-muted animate-pulse' : 
+                  'bg-muted/50'
                 }`}
-              />
-              <span className={`text-[10px] mt-1 ${
-                isCompleted ? 'text-primary font-medium' : 
-                isActive ? 'text-muted-foreground' : 
+              >
+                {phase.icon}
+              </div>
+              <span className={`text-[10px] font-medium ${
+                isCompleted ? 'text-primary' : 
+                isActive ? 'text-foreground' : 
                 'text-muted-foreground/50'
               }`}>
-                {phase}
+                {phase.name}
               </span>
             </div>
           );
         })}
+      </div>
+      
+      {/* Files being generated indicator */}
+      <div className="mt-4 pt-3 border-t border-border/50">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Generating: package.json, App.tsx, Navbar.tsx, Hero.tsx, Features.tsx...</span>
+        </div>
       </div>
     </div>
   );

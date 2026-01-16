@@ -332,14 +332,20 @@ export function useStreamingGeneration() {
       const output = extractOutput(accumulatedTextRef.current);
       const elapsed = ((Date.now() - startTimeRef.current) / 1000).toFixed(1);
       
-      console.log(`Generation complete: ${output.files.length} files extracted`);
+      console.log(`Generation complete: ${output.files.length} files extracted, preview length: ${output.preview.length}`);
       
       // If AI didn't return proper files array, generate component files from HTML
       let finalFiles = output.files;
-      if (finalFiles.length === 0 && output.preview) {
-        console.log("No files from AI - generating component structure from HTML");
-        finalFiles = generateFilesFromHtml(output.preview);
+      if (finalFiles.length < 3 && output.preview && output.preview.length > 500) {
+        console.log("Insufficient files from AI - generating component structure from HTML");
+        const generatedFiles = generateFilesFromHtml(output.preview);
+        // Merge AI files with generated files (AI files take priority)
+        if (generatedFiles.length > finalFiles.length) {
+          finalFiles = generatedFiles;
+        }
       }
+      
+      console.log(`Final files count: ${finalFiles.length}`, finalFiles.map(f => f.path));
       
       // Merge modified files with existing files (don't replace all)
       const mergedFiles = mergeFiles(currentFiles || [], finalFiles);

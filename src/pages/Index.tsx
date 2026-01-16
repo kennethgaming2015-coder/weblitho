@@ -552,10 +552,8 @@ const Index = () => {
         await saveProject(preview, files, updatedMessages);
 
         toast({
-          title: generatedPages.length > 1 ? "Website Generated" : "Page Generated",
-          description: generatedPages.length > 1 
-            ? `Your ${generatedPages.length}-page website is ready`
-            : "Your web page is ready",
+          title: generatedPages.length > 1 ? "🎉 Website Generated" : "🎉 Page Generated",
+          description: `Created ${files.length} component files${generatedPages.length > 1 ? ` across ${generatedPages.length} pages` : ''}`,
         });
       },
       onError: (errorMessage) => {
