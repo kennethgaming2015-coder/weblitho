@@ -654,31 +654,107 @@ function wrapInHtml(content: string): string {
 function generateFilesFromHtml(html: string): ProjectFile[] {
   const files: ProjectFile[] = [];
   
-  // Extract sections from HTML by looking for common patterns
-  const sectionPatterns = [
-    { name: 'Navbar', regex: /<nav[^>]*>[\s\S]*?<\/nav>/gi },
-    { name: 'Hero', regex: /<(?:section|div)[^>]*(?:id=["']hero["']|class="[^"]*hero[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
-    { name: 'Features', regex: /<(?:section|div)[^>]*(?:id=["']features["']|class="[^"]*features?[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
-    { name: 'Pricing', regex: /<(?:section|div)[^>]*(?:id=["']pricing["']|class="[^"]*pricing[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
-    { name: 'Testimonials', regex: /<(?:section|div)[^>]*(?:id=["']testimonials["']|class="[^"]*testimonials?[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
-    { name: 'FAQ', regex: /<(?:section|div)[^>]*(?:id=["']faq["']|class="[^"]*faq[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
-    { name: 'CTA', regex: /<(?:section|div)[^>]*(?:id=["']cta["']|class="[^"]*cta[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi },
-    { name: 'Footer', regex: /<footer[^>]*>[\s\S]*?<\/footer>/gi },
+  // Clean and normalize the HTML first
+  const cleanHtml = html.trim();
+  
+  // Define robust section extraction patterns - order matters (most specific first)
+  const sectionDefinitions = [
+    { name: 'Navbar', patterns: [
+      /<nav\b[^>]*>[\s\S]*?<\/nav>/gi,
+      /<header\b[^>]*>[\s\S]*?<\/header>/gi,
+    ]},
+    { name: 'Hero', patterns: [
+      /<!--\s*HERO[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|<footer|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["']hero["']|class="[^"]*\bhero\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+      /<section\b[^>]*class="[^"]*min-h-screen[^"]*"[^>]*>[\s\S]*?<\/section>/gi,
+    ]},
+    { name: 'SocialProof', patterns: [
+      /<!--\s*SOCIAL[\s\S]*?PROOF[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["'](?:social|logos|trusted)[^"]*["']|class="[^"]*\b(?:social-proof|logos?|trusted|partners)\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'Features', patterns: [
+      /<!--\s*FEATURES[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["']features?["']|class="[^"]*\bfeatures?\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'HowItWorks', patterns: [
+      /<!--\s*HOW[\s\S]*?WORKS[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["'](?:how-it-works|steps|process)["']|class="[^"]*\b(?:how-it-works|steps|process)\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'Testimonials', patterns: [
+      /<!--\s*TESTIMONIALS[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["']testimonials?["']|class="[^"]*\btestimonials?\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'Pricing', patterns: [
+      /<!--\s*PRICING[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["']pricing["']|class="[^"]*\bpricing\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'FAQ', patterns: [
+      /<!--\s*FAQ[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["']faq["']|class="[^"]*\bfaq\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'CTA', patterns: [
+      /<!--\s*CTA[\s\S]*?-->[\s\S]*?(?=<!--\s*[A-Z]+|<section|<footer|$)/gi,
+      /<(?:section|div)\b[^>]*(?:id=["']cta["']|class="[^"]*\bcta\b[^"]*")[^>]*>[\s\S]*?<\/(?:section|div)>/gi,
+    ]},
+    { name: 'Footer', patterns: [
+      /<footer\b[^>]*>[\s\S]*?<\/footer>/gi,
+    ]},
   ];
   
   const extractedSections: { name: string; content: string }[] = [];
+  const usedRanges: { start: number; end: number }[] = [];
   
   // Try to extract each section
-  for (const pattern of sectionPatterns) {
-    const match = html.match(pattern.regex);
-    if (match && match[0]) {
-      extractedSections.push({ name: pattern.name, content: match[0] });
+  for (const section of sectionDefinitions) {
+    for (const pattern of section.patterns) {
+      const matches = cleanHtml.match(pattern);
+      if (matches && matches[0]) {
+        const content = matches[0].trim();
+        const start = cleanHtml.indexOf(content);
+        const end = start + content.length;
+        
+        // Check if this range overlaps with already extracted sections
+        const overlaps = usedRanges.some(r => 
+          (start >= r.start && start < r.end) || 
+          (end > r.start && end <= r.end)
+        );
+        
+        if (!overlaps && content.length > 50) {
+          extractedSections.push({ name: section.name, content });
+          usedRanges.push({ start, end });
+          break;
+        }
+      }
     }
   }
   
-  // Extract styles
-  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-  const styles = styleMatch ? styleMatch[1] : '';
+  // If we couldn't extract sections, try a simpler approach: split by <section> tags
+  if (extractedSections.length < 3) {
+    console.log('Using section tag splitting fallback');
+    const sectionMatches = cleanHtml.match(/<section\b[^>]*>[\s\S]*?<\/section>/gi) || [];
+    const sectionNames = ['Hero', 'SocialProof', 'Features', 'HowItWorks', 'Testimonials', 'Pricing', 'FAQ', 'CTA'];
+    
+    sectionMatches.forEach((content, i) => {
+      if (i < sectionNames.length && !extractedSections.some(s => s.name === sectionNames[i])) {
+        extractedSections.push({ name: sectionNames[i], content });
+      }
+    });
+    
+    // Also extract nav and footer
+    const navMatch = cleanHtml.match(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi);
+    if (navMatch && !extractedSections.some(s => s.name === 'Navbar')) {
+      extractedSections.unshift({ name: 'Navbar', content: navMatch[0] });
+    }
+    
+    const footerMatch = cleanHtml.match(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi);
+    if (footerMatch && !extractedSections.some(s => s.name === 'Footer')) {
+      extractedSections.push({ name: 'Footer', content: footerMatch[0] });
+    }
+  }
+  
+  // Extract styles from <style> tag
+  const styleMatch = cleanHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const styles = styleMatch ? styleMatch[1].trim() : '';
   
   // Generate package.json
   files.push({
@@ -688,7 +764,7 @@ function generateFilesFromHtml(html: string): ProjectFile[] {
       version: "1.0.0",
       type: "module",
       scripts: { dev: "vite", build: "vite build", preview: "vite preview" },
-      dependencies: { "react": "^18.2.0", "react-dom": "^18.2.0" },
+      dependencies: { "react": "^18.2.0", "react-dom": "^18.2.0", "framer-motion": "^11.0.0" },
       devDependencies: {
         "@types/react": "^18.2.0",
         "@types/react-dom": "^18.2.0",
@@ -708,8 +784,25 @@ function generateFilesFromHtml(html: string): ProjectFile[] {
     content: `/** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
-  theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] } } },
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
   plugins: [],
+}`
+  });
+  
+  // Generate postcss.config.js
+  files.push({
+    path: 'postcss.config.js',
+    content: `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
 }`
   });
   
@@ -718,7 +811,10 @@ export default {
     path: 'vite.config.ts',
     content: `import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-export default defineConfig({ plugins: [react()] })`
+
+export default defineConfig({
+  plugins: [react()],
+})`
   });
   
   // Generate tsconfig.json
@@ -726,11 +822,20 @@ export default defineConfig({ plugins: [react()] })`
     path: 'tsconfig.json',
     content: JSON.stringify({
       compilerOptions: {
-        target: "ES2020", useDefineForClassFields: true,
-        lib: ["ES2020", "DOM", "DOM.Iterable"], module: "ESNext",
-        skipLibCheck: true, moduleResolution: "bundler",
-        allowImportingTsExtensions: true, resolveJsonModule: true,
-        isolatedModules: true, noEmit: true, jsx: "react-jsx", strict: true
+        target: "ES2020",
+        useDefineForClassFields: true,
+        lib: ["ES2020", "DOM", "DOM.Iterable"],
+        module: "ESNext",
+        skipLibCheck: true,
+        moduleResolution: "bundler",
+        allowImportingTsExtensions: true,
+        resolveJsonModule: true,
+        isolatedModules: true,
+        noEmit: true,
+        jsx: "react-jsx",
+        strict: true,
+        baseUrl: ".",
+        paths: { "@/*": ["./src/*"] }
       },
       include: ["src"]
     }, null, 2)
@@ -741,15 +846,52 @@ export default defineConfig({ plugins: [react()] })`
     path: 'index.html',
     content: `<!DOCTYPE html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Weblitho Project</title></head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <title>Weblitho Project</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>`
   });
   
-  // Generate src/index.css
+  // Generate src/index.css with custom styles
   files.push({
     path: 'src/index.css',
-    content: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n${styles}\n\nbody { font-family: 'Inter', system-ui, sans-serif; }`
+    content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #030305;
+  color: white;
+}
+
+.glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7, #ec4899);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glow {
+  box-shadow: 0 0 60px rgba(139,92,246,0.3);
+}
+
+${styles}`
   });
   
   // Generate src/main.tsx
@@ -761,41 +903,63 @@ import App from './App'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><App /></React.StrictMode>
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
 )`
   });
   
-  // Generate component files
+  // Generate component files from extracted sections
   const componentImports: string[] = [];
   const componentUsage: string[] = [];
+  
+  // Helper to escape HTML content for use in template literals
+  const escapeForTemplateLiteral = (str: string): string => {
+    return str
+      .replace(/\\/g, '\\\\')
+      .replace(/`/g, '\\`')
+      .replace(/\$/g, '\\$');
+  };
   
   for (const section of extractedSections) {
     componentImports.push(`import ${section.name} from './components/${section.name}'`);
     componentUsage.push(`      <${section.name} />`);
     
-    // Escape the content for JSX
-    const escapedContent = section.content
-      .replace(/\{/g, '{"{"}')
-      .replace(/\}/g, '{"}"}'  );
+    const escapedContent = escapeForTemplateLiteral(section.content);
     
     files.push({
       path: `src/components/${section.name}.tsx`,
       content: `export default function ${section.name}() {
   return (
-    <div dangerouslySetInnerHTML={{ __html: \`${section.content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\` }} />
+    <div dangerouslySetInnerHTML={{ __html: \`${escapedContent}\` }} />
   )
 }`
     });
   }
   
-  // Generate src/App.tsx
+  // If no sections extracted, create a single App with full HTML
   const appContent = componentImports.length > 0 
-    ? `${componentImports.join('\n')}\n\nexport default function App() {\n  return (\n    <div className="min-h-screen bg-[#030305] text-white">\n${componentUsage.join('\n')}\n    </div>\n  )\n}`
-    : `export default function App() {\n  return (\n    <div className="min-h-screen bg-[#030305] text-white" dangerouslySetInnerHTML={{ __html: \`${html.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\` }} />\n  )\n}`;
+    ? `${componentImports.join('\n')}
+
+export default function App() {
+  return (
+    <div className="min-h-screen bg-[#030305] text-white antialiased overflow-x-hidden">
+${componentUsage.join('\n')}
+    </div>
+  )
+}`
+    : `export default function App() {
+  return (
+    <div 
+      className="min-h-screen bg-[#030305] text-white antialiased overflow-x-hidden" 
+      dangerouslySetInnerHTML={{ __html: \`${escapeForTemplateLiteral(cleanHtml)}\` }} 
+    />
+  )
+}`;
   
   files.push({ path: 'src/App.tsx', content: appContent });
   
-  console.log(`Generated ${files.length} files from HTML (extracted ${extractedSections.length} sections)`);
+  console.log(`Generated ${files.length} files from HTML (extracted ${extractedSections.length} component sections)`);
   
   return files;
 }
