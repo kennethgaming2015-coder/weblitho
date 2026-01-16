@@ -72,7 +72,7 @@ export const ProjectSidebar = ({
   onFileSelect,
 }: ProjectSidebarProps) => {
   const [pagesOpen, setPagesOpen] = useState(true);
-  const [filesOpen, setFilesOpen] = useState(false);
+  const [filesOpen, setFilesOpen] = useState(true); // Default to open to show files
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newPageName, setNewPageName] = useState('');
   const [newPagePath, setNewPagePath] = useState('');
@@ -126,6 +126,15 @@ export const ProjectSidebar = ({
 
   return (
     <div className="flex flex-col h-full bg-card/30">
+      {/* Files Count Badge */}
+      {files && files.length > 0 && (
+        <div className="px-3 py-2 border-b border-border/50 bg-primary/5">
+          <div className="flex items-center gap-2 text-xs">
+            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-medium text-foreground">{files.length} files generated</span>
+          </div>
+        </div>
+      )}
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
           {/* Pages Section */}
@@ -242,8 +251,8 @@ export const ProjectSidebar = ({
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Files Section */}
-          {files.length > 0 && (
+          {/* Files Section - Always show when files exist */}
+          {files && files.length > 0 && (
             <Collapsible open={filesOpen} onOpenChange={setFilesOpen}>
               <CollapsibleTrigger asChild>
                 <Button
