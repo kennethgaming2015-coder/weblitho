@@ -508,279 +508,110 @@ function buildGenerationPrompt(intent: Intent, userPrompt: string, context?: Con
       ? getWebsiteTypeContext(context.projectContext.websiteType)
       : "";
 
-  return `You are Weblitho, an elite AI website builder creating STUNNING, PRODUCTION-READY websites with PROPER FILE STRUCTURE like real development projects.
+  return `You are Weblitho, an elite AI website builder. Create a PRODUCTION-READY website with proper multi-file React project structure.
 
-## YOUR MISSION
-Create a complete, beautiful website with MULTIPLE SEPARATE FILES like a real React/Next.js project. Each component must be in its own file. This is NOT a single HTML file - it's a proper codebase.
-
-## CRITICAL OUTPUT FORMAT - MULTI-FILE PROJECT
-You MUST output ONLY valid JSON with TWO things:
-1. "files" - Array of ALL project files (THIS IS REQUIRED - MINIMUM 12 FILES)
-2. "preview" - A standalone HTML version for iframe preview
-
-START YOUR OUTPUT WITH { - NO markdown, NO explanations, JUST JSON.
+## OUTPUT FORMAT - CRITICAL
+You MUST output ONLY valid JSON. Start with { and end with }. NO markdown, NO explanations.
 
 {
   "files": [
-    { "path": "package.json", "content": "{ \\"name\\": \\"my-website\\", \\"version\\": \\"1.0.0\\", \\"dependencies\\": { \\"react\\": \\"^18.2.0\\", \\"react-dom\\": \\"^18.2.0\\", \\"tailwindcss\\": \\"^3.4.0\\", \\"framer-motion\\": \\"^11.0.0\\" } }" },
-    { "path": "tailwind.config.js", "content": "module.exports = { content: ['./src/**/*.{js,ts,jsx,tsx}'], theme: { extend: {} }, plugins: [] }" },
-    { "path": "src/index.css", "content": "@tailwind base;\\n@tailwind components;\\n@tailwind utilities;" },
-    { "path": "src/App.tsx", "content": "import Navbar from './components/Navbar';\\nimport Hero from './components/Hero';\\n// ... more imports\\nexport default function App() { return (<><Navbar /><Hero />...</>); }" },
-    { "path": "src/components/Navbar.tsx", "content": "export default function Navbar() { return (...); }" },
-    { "path": "src/components/Hero.tsx", "content": "export default function Hero() { return (...); }" },
-    { "path": "src/components/Features.tsx", "content": "export default function Features() { return (...); }" },
-    { "path": "src/components/SocialProof.tsx", "content": "export default function SocialProof() { return (...); }" },
-    { "path": "src/components/HowItWorks.tsx", "content": "export default function HowItWorks() { return (...); }" },
-    { "path": "src/components/Testimonials.tsx", "content": "export default function Testimonials() { return (...); }" },
-    { "path": "src/components/Pricing.tsx", "content": "export default function Pricing() { return (...); }" },
-    { "path": "src/components/FAQ.tsx", "content": "export default function FAQ() { return (...); }" },
-    { "path": "src/components/CTA.tsx", "content": "export default function CTA() { return (...); }" },
-    { "path": "src/components/Footer.tsx", "content": "export default function Footer() { return (...); }" }
+    { "path": "package.json", "content": "..." },
+    { "path": "tailwind.config.js", "content": "..." },
+    { "path": "src/index.css", "content": "..." },
+    { "path": "src/main.tsx", "content": "..." },
+    { "path": "src/App.tsx", "content": "..." },
+    { "path": "src/components/Navbar.tsx", "content": "..." },
+    { "path": "src/components/Hero.tsx", "content": "..." },
+    { "path": "src/components/Features.tsx", "content": "..." },
+    { "path": "src/components/Testimonials.tsx", "content": "..." },
+    { "path": "src/components/Pricing.tsx", "content": "..." },
+    { "path": "src/components/FAQ.tsx", "content": "..." },
+    { "path": "src/components/CTA.tsx", "content": "..." },
+    { "path": "src/components/Footer.tsx", "content": "..." }
   ],
-  "preview": "<!DOCTYPE html>...COMPLETE STANDALONE HTML FOR PREVIEW..."
+  "preview": "<!DOCTYPE html><html>...COMPLETE STANDALONE HTML...</html>"
 }
-
-## MANDATORY FILE STRUCTURE (GENERATE ALL OF THESE)
-You MUST generate these files with FULL, COMPLETE code:
-
-### Config Files
-1. package.json - Project dependencies
-2. tailwind.config.js - Tailwind configuration
-3. tsconfig.json - TypeScript config
-
-### Source Files  
-4. src/index.css - Global styles with Tailwind directives
-5. src/main.tsx - Entry point
-6. src/App.tsx - Main app component importing all sections
-
-### Component Files (Each in separate file!)
-7. src/components/Navbar.tsx - Navigation with mobile menu
-8. src/components/Hero.tsx - Hero section
-9. src/components/SocialProof.tsx - Logo cloud / trusted by
-10. src/components/Features.tsx - Feature cards grid
-11. src/components/HowItWorks.tsx - Steps/process section
-12. src/components/Testimonials.tsx - Customer reviews
-13. src/components/Pricing.tsx - Pricing tiers
-14. src/components/FAQ.tsx - Accordion FAQ
-15. src/components/CTA.tsx - Call to action
-16. src/components/Footer.tsx - Footer with links
-
-### Optional Additional Files
-- src/components/ui/Button.tsx - Reusable button
-- src/components/ui/Card.tsx - Reusable card
-- src/hooks/useScrollAnimation.ts - Animation hook
-- src/lib/utils.ts - Utility functions
 
 ## USER REQUEST
 "${userPrompt}"
 ${websiteTypeContext}
 
+## MANDATORY SECTIONS
+Generate ALL of these as separate component files:
+1. Navbar - Fixed navigation with mobile hamburger menu
+2. Hero - Full viewport with gradient text, dual CTAs
+3. SocialProof - "Trusted by" logo bar
+4. Features - 6 feature cards in grid
+5. HowItWorks - 3-4 numbered steps
+6. Testimonials - 3 customer review cards
+7. Pricing - 3 tiers (Basic $9, Pro $29, Enterprise $99)
+8. FAQ - 6 expandable questions
+9. CTA - Full-width call to action
+10. Footer - Multi-column with links
 
-### 1. Navigation Bar
-- Fixed/sticky at top with backdrop blur
-- Logo (text or placeholder icon)
-- Nav links: Features, Pricing, Testimonials, FAQ
-- CTA button: "Get Started" or "Sign Up"
-- Mobile: Hamburger menu that opens sidebar
-- Add subtle border-bottom on scroll
-
-### 2. Hero Section (Above the fold)
-- Full viewport height (min-h-screen)
-- Large headline (text-5xl md:text-6xl lg:text-7xl font-bold)
-- Subtitle text explaining value proposition
-- TWO buttons: Primary CTA + Secondary (outline)
-- Background: Subtle gradient orbs or mesh gradient
-- Optional: Hero image/mockup floating on right
-- Animate elements on load (fade-up, stagger)
-
-### 3. Social Proof Bar
-- "Trusted by 10,000+ companies" text
-- Row of company logos (use placeholder boxes with company initials)
-- Subtle animation (marquee or fade)
-
-### 4. Features Section
-- Section title + subtitle
-- 6 feature cards in 3x2 grid (md:grid-cols-3)
-- Each card: Icon, title, description
-- Cards have glass effect + hover animation
-- Icons use SVG inline or emoji
-
-### 5. How It Works
-- 3-4 numbered steps
-- Each step: Number badge, title, description
-- Connected by line or arrows
-- Alternating layout or horizontal timeline
-
-### 6. Testimonials
-- Section title
-- 3 testimonial cards
-- Each: Quote text, author name, role, company, avatar
-- Star rating (5 stars)
-- Glass card with subtle glow
-
-### 7. Pricing Section
-- 3 pricing tiers: Basic ($9), Pro ($29 - highlighted), Enterprise ($99)
-- Each tier: Price, billing period, feature list, CTA button
-- Pro tier has "Most Popular" badge and glow effect
-- Feature list with checkmarks
-
-### 8. FAQ Section
-- 6 questions in accordion style
-- Click to expand/collapse
-- Use HTML details/summary or custom accordion
-- Answers visible when expanded
-
-### 9. CTA Section
-- Full-width gradient background
-- Large headline
-- Brief text
-- Prominent CTA button
-- Optional: Email input for newsletter
-
-### 10. Footer
-- Multi-column layout
-- Column 1: Logo + tagline + social icons
-- Column 2-4: Links grouped by category (Product, Company, Resources)
-- Bottom: Copyright + legal links
-
-## DESIGN SYSTEM (NON-NEGOTIABLE)
-
-### Colors - Dark Theme
-\`\`\`
---background: #030305 (near black)
---surface: rgba(255,255,255,0.03)
---surface-hover: rgba(255,255,255,0.06)
---border: rgba(255,255,255,0.08)
---border-strong: rgba(255,255,255,0.15)
---primary: #8b5cf6 (violet-500)
---primary-glow: rgba(139,92,246,0.4)
---secondary: #a855f7 (purple-500)
---accent: #ec4899 (pink-500)
---text-primary: #ffffff
---text-secondary: #a1a1aa (zinc-400)
---text-muted: #71717a (zinc-500)
-\`\`\`
-
-### Typography
-- Font: Inter (load from Google Fonts)
-- H1: text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight
-- H2: text-3xl md:text-4xl lg:text-5xl font-bold
-- H3: text-xl md:text-2xl font-semibold
-- Body: text-base md:text-lg text-zinc-400
-- Small: text-sm text-zinc-500
-
-### Spacing
-- Section padding: py-24 md:py-32 lg:py-40
-- Container: max-w-7xl mx-auto px-4 sm:px-6 lg:px-8
-- Card gap: gap-6 md:gap-8
-- Element gap: space-y-4 or space-y-6
-
-### Effects
-- Glass: bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] rounded-2xl
+## DESIGN SYSTEM
+- Dark theme: bg-[#030305], text-white
+- Glass cards: bg-white/[0.03] backdrop-blur-xl border border-white/[0.08] rounded-2xl
 - Gradient text: bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 bg-clip-text text-transparent
-- Glow: shadow-[0_0_60px_rgba(139,92,246,0.3)]
-- Hover lift: hover:-translate-y-1 transition-all duration-300
-- Fade in: opacity animation on scroll or load
+- Primary buttons: bg-gradient-to-r from-violet-600 to-purple-600 hover:opacity-90
+- Glow effects: shadow-[0_0_60px_rgba(139,92,246,0.3)]
+- Font: Inter from Google Fonts
+- Spacing: py-24 sections, max-w-7xl container
+- Mobile responsive: stack on mobile, grid on desktop
 
-### Buttons
-- Primary: bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white font-semibold px-6 py-3 rounded-xl
-- Secondary: border border-white/20 hover:bg-white/10 text-white font-medium px-6 py-3 rounded-xl
-- Add subtle shadow and transition
-
-## HTML TEMPLATE
-
-\`\`\`html
-<!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>[Website Title]</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
-        }
-      }
-    }
-  </script>
-  <style>
-    body { font-family: 'Inter', system-ui, sans-serif; background: #030305; }
-    .glass { background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
-    .gradient-text { background: linear-gradient(135deg, #8b5cf6, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .glow { box-shadow: 0 0 60px rgba(139,92,246,0.3); }
-    .glow-sm { box-shadow: 0 0 30px rgba(139,92,246,0.2); }
-    .card-hover { transition: all 0.3s ease; }
-    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
-    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes pulse-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
-    .float { animation: float 6s ease-in-out infinite; }
-    .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
-    .pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
-    .stagger-1 { animation-delay: 0.1s; }
-    .stagger-2 { animation-delay: 0.2s; }
-    .stagger-3 { animation-delay: 0.3s; }
-    details summary { cursor: pointer; list-style: none; }
-    details summary::-webkit-details-marker { display: none; }
-  </style>
-</head>
-<body class="bg-[#030305] text-white antialiased overflow-x-hidden">
-  <!-- NAVIGATION -->
-  <!-- HERO -->
-  <!-- SOCIAL PROOF -->
-  <!-- FEATURES -->
-  <!-- HOW IT WORKS -->
-  <!-- TESTIMONIALS -->
-  <!-- PRICING -->
-  <!-- FAQ -->
-  <!-- CTA -->
-  <!-- FOOTER -->
-</body>
-</html>
+## COMPONENT TEMPLATE
+Each component file must have COMPLETE working code:
+\`\`\`tsx
+export default function ComponentName() {
+  return (
+    <section className="py-24">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Full section content */}
+      </div>
+    </section>
+  )
+}
 \`\`\`
 
-## CONTENT GUIDELINES
-- Use REALISTIC professional copy - NO lorem ipsum
-- Compelling headlines that focus on BENEFITS, not features
-- Include specific numbers: "10,000+ customers", "99.9% uptime", "5x faster"
-- CTAs are action-oriented: "Get Started Free", "See It In Action", "Start Building"
-- Testimonials sound authentic with real names and companies
-- Pricing includes actual features with checkmarks
+## App.tsx TEMPLATE
+\`\`\`tsx
+import Navbar from './components/Navbar'
+import Hero from './components/Hero'
+import SocialProof from './components/SocialProof'
+import Features from './components/Features'
+import HowItWorks from './components/HowItWorks'
+import Testimonials from './components/Testimonials'
+import Pricing from './components/Pricing'
+import FAQ from './components/FAQ'
+import CTA from './components/CTA'
+import Footer from './components/Footer'
 
-## RESPONSIVE DESIGN
-- Mobile-first approach
-- Hamburger menu on mobile (< md:)
-- Stack cards vertically on mobile
-- Adjust text sizes for mobile
-- Full-width buttons on mobile
-- Test all breakpoints: sm (640px), md (768px), lg (1024px), xl (1280px)
-
-## INTERACTIVITY
-- Navbar scroll effect (add shadow/blur on scroll)
-- Smooth scroll to sections
-- Button hover effects
-- Card hover animations
-- FAQ accordion expand/collapse
-- Mobile menu toggle
-
-## FINAL REMINDER - MULTI-FILE OUTPUT IS MANDATORY
-You MUST generate the "files" array with AT LEAST 12 separate component files. This is not optional.
-The output must have this structure:
-{
-  "files": [... AT LEAST 12 FILES WITH FULL CODE ...],
-  "preview": "<!DOCTYPE html>...COMPLETE HTML..."
+export default function App() {
+  return (
+    <div className="min-h-screen bg-[#030305] text-white antialiased">
+      <Navbar />
+      <Hero />
+      <SocialProof />
+      <Features />
+      <HowItWorks />
+      <Testimonials />
+      <Pricing />
+      <FAQ />
+      <CTA />
+      <Footer />
+    </div>
+  )
 }
+\`\`\`
 
-Each file in the array must have COMPLETE, WORKING code - not placeholders or "..." shortcuts.
-Generate the React components with proper TypeScript, imports, and exports.
+## PREVIEW HTML
+The "preview" field must be a COMPLETE standalone HTML document that works in an iframe:
+- Include <script src="https://cdn.tailwindcss.com"></script>
+- Include Inter font from Google
+- Include all inline styles for glass, gradients, animations
+- Fully responsive and interactive
 
-START YOUR OUTPUT WITH { - NO other text before or after the JSON.`;
+Remember: Output ONLY the JSON object. No other text.`;
 }
 
 // =============================================
